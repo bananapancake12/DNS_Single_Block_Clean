@@ -32,17 +32,18 @@ module declaration
   integer,pointer:: bandPL(:)
   integer,pointer:: bandPL_FFT(:)
   integer           jgal(3,2),igal,kgal !TODO get rid of jgal
-  integer,pointer:: dk(:,:,:,:)
+  ! integer,pointer:: dk(:,:,:,:)
   ! integer,pointer:: columns_i(:,:,:)
   ! integer,pointer:: columns_k(:,:,:)
   ! integer,pointer:: columns_num(:,:)
-  integer,pointer:: dk_phys(:,:,:,:)
+  ! integer,pointer:: dk_phys(:,:,:,:)
 
   integer, allocatable :: columns_num(:)
   integer, allocatable :: columns_i(:,:)
   integer, allocatable :: columns_k(:,:)
   integer, allocatable :: jlim(:,:)
   integer, allocatable :: dk(:,:)
+  integer, allocatable :: dk_phys(:,:)
   
   
   integer,pointer:: planeBC(:,:)

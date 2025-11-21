@@ -2497,33 +2497,33 @@ subroutine proc_lims_columns(myid)
 
   ! Used in FOU3D and stats
   ! It's a shift in z, used to align modes in different bands
-  allocate(dk(max_columns_num,nband,0:np-1,sband:eband))
+  allocate(dk(max_columns_num,0:np-1))
   dk = 0
   do iproc = 0,np-1
-    do iblock = sband,eband
-      do iband = sband,eband
         do column = 1,columns_num(iproc)
-          if (columns_k(column,iproc) > N(2,1)/2) then
-            dk(column,iblock,iproc,iband) = N(2,1)-Ngal(2,iband)
-
-            write(6,*) "dk", dk
+          if (columns_k(column,iproc) > N(2,nband)/2) then
+            dk(column,iproc) = N(2,nband)-Ngal(2,nband)
+            !write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
           end if
-        end do
-      end do
     end do
   end do
+
+  !   do iproc = 0,np-1
+  !       do column = 1,columns_num(iproc)
+  !         if (columns_k(column,iproc) > N(2,nband)/2) then
+  !           write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
+  !         end if
+  !   end do
+  ! end do
+
   
-  allocate(dk_phys(max_columns_num,nband,0:np-1,sband:eband))
+  allocate(dk_phys(max_columns_num,0:np-1))
   dk_phys = 0
   do iproc = 0,np-1
-    do iblock = sband,eband
-      do iband = 2,2
         do column = 1,columns_num(iproc)
           if (columns_k(column,iproc) > N(2,1)/2) then
-            dk_phys(column,iblock,iproc,iband) = N(2,1)-N(2,iband)
+            dk_phys(column,iproc) = N(2,1)-N(2,iband)
           end if
-        end do
-      end do
     end do
   end do
   
