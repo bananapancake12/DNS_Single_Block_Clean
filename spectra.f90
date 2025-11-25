@@ -23,11 +23,11 @@ subroutine buildsp(sp,u,grid,myid)
   use declaration
   implicit none
   integer j,column,grid,myid
-  real(8)    sp(jlim(1,grid,midband):jlim(2,grid,midband),columns_num(midband,myid))
-  complex(8) u (jlim(1,grid,midband):jlim(2,grid,midband),columns_num(midband,myid))
+  real(8)    sp(jlim(1,grid):jlim(2,grid),columns_num(myid))
+  complex(8) u (jlim(1,grid):jlim(2,grid),columns_num(myid))
 
-  do column = 1,columns_num(midband,myid)
-    do j = jlim(1,grid,midband),jlim(2,grid,midband)
+  do column = 1,columns_num(myid)
+    do j = jlim(1,grid),jlim(2,grid)
       sp(j,column) = sp(j,column)+dreal(u(j,column))**2+dimag(u(j,column))**2
     end do
   end do
@@ -42,12 +42,12 @@ subroutine buildspUV(sp,u,v,myid)
   use declaration
   implicit none
   integer j,column,grid,myid
-  real(8)    sp(jlim(1,ugrid,midband):jlim(2,ugrid,midband),columns_num(midband,myid))
-  complex(8) u (jlim(1,ugrid,midband):jlim(2,ugrid,midband),columns_num(midband,myid))
-  complex(8) v (jlim(1,ugrid,midband):jlim(2,ugrid,midband),columns_num(midband,myid))
+  real(8)    sp(jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
+  complex(8) u (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
+  complex(8) v (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
 
-  do column = 1,columns_num(midband,myid)
-    do j = jlim(1,ugrid,midband),jlim(2,ugrid,midband)
+  do column = 1,columns_num(myid)
+    do j = jlim(1,ugrid),jlim(2,ugrid)
         sp(j,column) = sp(j,column)+dreal(u(j,column))*dreal(v(j,column)) &
 &                                  +dimag(u(j,column))*dimag(v(j,column))
     end do
@@ -70,18 +70,18 @@ subroutine write_spect(myid,status,ierr)
   integer msizeu,msizev,msizep
 
   if (myid/=0) then
-    msizeu = (jlim(2,ugrid,midband)-jlim(1,ugrid,midband)+1)*columns_num(midband,myid)
-    msizev = (jlim(2,vgrid,midband)-jlim(1,vgrid,midband)+1)*columns_num(midband,myid)
-    msizep = (jlim(2,pgrid,midband)-jlim(1,pgrid,midband)+1)*columns_num(midband,myid)
+    msizeu = (jlim(2,ugrid)-jlim(1,ugrid)+1)*columns_num(myid)
+    msizev = (jlim(2,vgrid)-jlim(1,vgrid)+1)*columns_num(myid)
+    msizep = (jlim(2,pgrid)-jlim(1,pgrid)+1)*columns_num(myid)
     call MPI_SEND(spU ,msizeu,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
     call MPI_SEND(spV ,msizev,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
     call MPI_SEND(spW ,msizeu,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
     call MPI_SEND(spUV,msizeu,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
     call MPI_SEND(spP ,msizep,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
   else
-    allocate(buffSPu(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,ugrid,midband):jlim(2,ugrid,midband)))
-    allocate(buffSPv(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,vgrid,midband):jlim(2,vgrid,midband)))
-    allocate(buffSPp(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,pgrid,midband):jlim(2,pgrid,midband)))
+    allocate(buffSPu(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,ugrid):jlim(2,ugrid)))
+    allocate(buffSPv(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,vgrid):jlim(2,vgrid)))
+    allocate(buffSPp(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,pgrid):jlim(2,pgrid)))
 
     fnameimb='output/spU_' //ext1//'x'//ext2//'x'//ext3//'_'//ext4//'.dat'
     call recvwrspec(spU ,buffSPu,ugrid,myid,status,ierr)
@@ -119,18 +119,18 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
 
   integer i,k,kk,j,iproc,column,grid,myid
   integer msize
-  real(8)    spX(jlim(1,grid,midband):jlim(2,grid,midband),columns_num(midband,myid))
+  real(8)    spX(jlim(1,grid):jlim(2,grid),columns_num(myid))
   !The following +1 in 1:N(2,midband)/2+1 shouldn't be there but is consistent with the postprocessing....
-  real(8) buffSP(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,grid,midband):jlim(2,grid,midband))
+  real(8) buffSP(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,grid):jlim(2,grid))
   real(8), allocatable:: buffrecv(:,:)
   integer, allocatable:: dummint(:)
 
   buffSP = 0d0
 
-  do j = jlim(1,grid,midband),jlim(2,grid,midband)
-    do column = 1,columns_num(midband,myid)
-      i = columns_i(column,midband,myid)
-      k = columns_k(column,midband,myid)
+  do j = jlim(1,grid),jlim(2,grid)
+    do column = 1,columns_num(myid)
+      i = columns_i(column,myid)
+      k = columns_k(column,myid)
       if (k > N(2,1)/2) then
         kk = N(2,1)+2-k
       else
@@ -141,13 +141,13 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
   end do
 
   do iproc = 1,np-1
-    msize = (jlim(2,grid,midband)-jlim(1,grid,midband)+1)*columns_num(midband,iproc)
-    allocate(buffrecv(jlim(1,grid,midband):jlim(2,grid,midband),columns_num(midband,iproc)))
+    msize = (jlim(2,grid)-jlim(1,grid)+1)*columns_num(iproc)
+    allocate(buffrecv(jlim(1,grid):jlim(2,grid),columns_num(iproc)))
     call MPI_RECV(buffrecv,msize,MPI_REAL8,iproc,iproc,MPI_COMM_WORLD,status,ierr)
-    do j = jlim(1,grid,midband),jlim(2,grid,midband)
-      do column = 1,columns_num(midband,iproc)
-        i = columns_i(column,midband,iproc)
-        k = columns_k(column,midband,iproc)
+    do j = jlim(1,grid),jlim(2,grid)
+      do column = 1,columns_num(iproc)
+        i = columns_i(column,iproc)
+        k = columns_k(column,iproc)
         if (k > N(2,1)/2) then
           kk = N(2,1)+2-k
         else
@@ -159,9 +159,9 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
     deallocate(buffrecv)
   end do
 
-  do j = jlim(1,grid,midband),jlim(2,grid,midband)
-    do k = 1,N(2,midband)/2
-      do i = 1,N(1,midband)/2
+  do j = jlim(1,grid),jlim(2,grid)
+    do k = 1,N(2,nband)/2
+      do i = 1,N(1,nband)/2
         buffSP(i,k,j) = 2d0*buffSP(i,k,j)
       end do
     end do

@@ -76,16 +76,16 @@ subroutine sl_stats(u1,u3,myid,status,ierr)
 istat_sl=istat_sl+1
   
   do iband=1,2
-    do column = 1,columns_num(iband,myid)
-      j = jlim(1,vgrid,2)
+    do column = 1,columns_num(myid)
+      j = jlim(1,vgrid)
       du1dy_columns(iband)%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
       du3dy_columns(iband)%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
   enddo
   
   do iband=2,3
-    do column = 1,columns_num(iband,myid)
-      j = jlim(2,vgrid,2)
+    do column = 1,columns_num(myid)
+      j = jlim(2,vgrid)
       du1dy_columns(iband)%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
       du3dy_columns(iband)%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
@@ -96,15 +96,15 @@ istat_sl=istat_sl+1
   u1_f_PL = 0d0
   u3_f_PL = 0d0
   
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid,2),jlim(1,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid,2),jlim(1,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid,2),jlim(2,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid,2),jlim(2,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
   
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid,2),jlim(1,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid,2),jlim(1,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid,2),jlim(2,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid,2),jlim(2,vgrid,2),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
   
     
   if(myid==0)then
@@ -116,10 +116,10 @@ istat_sl=istat_sl+1
   do i = 1,N(1,bandPL(myid))+2
       do k = 1,N(2,bandPL(myid))
 
-        bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(1,vgrid,2))
-        bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(1,vgrid,2))
-        bslip_u3_M(i,k)    = bslip_u3_M(i,k) + u3_f_PL(i,k,jlim(1,vgrid,2))
-        bslip_du3dy_M(i,k) = bslip_du3dy_M(i,k) + du3dy_PL(i,k,jlim(1,vgrid,2))
+        bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(1,vgrid))
+        bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(1,vgrid))
+        bslip_u3_M(i,k)    = bslip_u3_M(i,k) + u3_f_PL(i,k,jlim(1,vgrid))
+        bslip_du3dy_M(i,k) = bslip_du3dy_M(i,k) + du3dy_PL(i,k,jlim(1,vgrid))
        
       enddo
     enddo
@@ -134,10 +134,10 @@ istat_sl=istat_sl+1
   do i = 1,N(1,bandPL(myid))+2
       do k = 1,N(2,bandPL(myid))
 
-        bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(2,vgrid,2))
-        bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(2,vgrid,2))
-        bslip_u3_M(i,k)    = bslip_u3_M(i,k) + u3_f_PL(i,k,jlim(2,vgrid,2))
-        bslip_du3dy_M(i,k) = bslip_du3dy_M(i,k) + du3dy_PL(i,k,jlim(2,vgrid,2))
+        bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(2,vgrid))
+        bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(2,vgrid))
+        bslip_u3_M(i,k)    = bslip_u3_M(i,k) + u3_f_PL(i,k,jlim(2,vgrid))
+        bslip_du3dy_M(i,k) = bslip_du3dy_M(i,k) + du3dy_PL(i,k,jlim(2,vgrid))
        
       enddo
     enddo

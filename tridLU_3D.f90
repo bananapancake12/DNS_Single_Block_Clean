@@ -78,13 +78,13 @@ subroutine LUsolU(x,grid,myid)
   !physlim_top = 144 !NO WALL! 145 !? Last physical point
 
   !ay(BC,diag,j,iband)
-  allocate(ay(2,3,jlim(1,grid,2):jlim(2,grid,2),nband))
+  allocate(ay(2,3,jlim(1,grid):jlim(2,grid),nband))
   allocate(axz(maxval(columns_num),nband))
 
   do iband = sband,eband
-    call LU_build(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,axz,ay)
-    call LU_dec(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,ay(1,:,:,:))
-    call LU_dec(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,ay(2,:,:,:))
+    call LU_build(jlim(1,grid),jlim(2,grid),grid,myid,iband,axz,ay)
+    call LU_dec(jlim(1,grid),jlim(2,grid),grid,myid,iband,ay(1,:,:,:))
+    call LU_dec(jlim(1,grid),jlim(2,grid),grid,myid,iband,ay(2,:,:,:))
   enddo
   
 ! ! FFT CHECK
@@ -100,8 +100,8 @@ subroutine LUsolU(x,grid,myid)
 !  ay(2,:,:,:)=ay(1,:,:,:) !NS - Wall check
  
    do iband = sband,eband
-    do column = 1,columns_num(iband,myid)
-      do j=jlim(1,grid,iband)+1,jlim(2,grid,iband)-1 !C! Don't include first and last as BC's
+    do column = 1,columns_num(myid)
+      do j=jlim(1,grid)+1,jlim(2,grid)-1 !C! Don't include first and last as BC's
         x(iband)%f(j,column)=x(iband)%f(j,column)/axz(column,iband)
         
       enddo
@@ -145,8 +145,8 @@ subroutine LUsolU(x,grid,myid)
   
   xPL=0d0
   !FFT physlim_bot
-  call modes_to_planes_phys_lims(xPL,x,jlim(1,grid,2),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
-  call modes_to_planes_phys_lims(xPL,x,physlim_top+1,jlim(2,grid,2),grid,myid,bandPL_FFT(myid),status,ierr)
+  call modes_to_planes_phys_lims(xPL,x,jlim(1,grid),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
+  call modes_to_planes_phys_lims(xPL,x,physlim_top+1,jlim(2,grid),grid,myid,bandPL_FFT(myid),status,ierr)
   do j=limPL_FFT(grid,1,myid),limPL_FFT(grid,2,myid)
     if(j<=physlim_bot)then
       call four_to_phys_N(xPL(1,1,j),bandPL_FFT(myid))
@@ -155,41 +155,41 @@ subroutine LUsolU(x,grid,myid)
       call four_to_phys_N(xPL(1,1,j),bandPL_FFT(myid))
     endif
   enddo
-  call planes_to_modes_phys_lims(x,xPL,jlim(1,grid,2),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
-  call planes_to_modes_phys_lims(x,xPL,physlim_top+1,jlim(2,grid,2),grid,myid,bandPL_FFT(myid),status,ierr)
+  call planes_to_modes_phys_lims(x,xPL,jlim(1,grid),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
+  call planes_to_modes_phys_lims(x,xPL,physlim_top+1,jlim(2,grid),grid,myid,bandPL_FFT(myid),status,ierr)
    
   !First point in band
   !Physical
   do iband = 1,2 ! (1)
-    do column = 1,columns_num(iband,myid)
+    do column = 1,columns_num(myid)
       !NS or FS
-x(iband)%f(jlim(1,grid,iband),column) = real(x(iband)%f(jlim(1,grid,iband),column)*&
-&ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),2,jlim(1,grid,iband),iband))&
-&+im*aimag(x(iband)%f(jlim(1,grid,iband),column)*&
-&ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),2,jlim(1,grid,iband),iband))
+x(iband)%f(jlim(1,grid),column) = real(x(iband)%f(jlim(1,grid),column)*&
+&ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),2,jlim(1,grid),iband))&
+&+im*aimag(x(iband)%f(jlim(1,grid),column)*&
+&ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),2,jlim(1,grid),iband))
     enddo
   enddo
    
    !First point in band
    !Fourier
    iband = 3 ! (4)
-   do column = 1,columns_num(iband,myid)
+   do column = 1,columns_num(myid)
      !Taking NS
-     x(iband)%f(jlim(1,grid,iband),column) = x(iband)%f(jlim(1,grid,iband),column)*ay(1,2,jlim(1,grid,iband),iband)
+     x(iband)%f(jlim(1,grid),column) = x(iband)%f(jlim(1,grid),column)*ay(1,2,jlim(1,grid),iband)
    enddo
   
  !Heading UP
  !Physical
   do iband = 1,2 ! (1)
-    do j = jlim(1,grid,iband)+1,physlim_bot
-      do column = 1,columns_num(iband,myid)     
+    do j = jlim(1,grid)+1,physlim_bot
+      do column = 1,columns_num(myid)     
         !NS or FS   
 x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),1,j,iband)*&
-&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),2,j,iband))+&
+&ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),1,j,iband)*&
+&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),2,j,iband))+&
 &im*aimag((x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),1,j,iband)*&
-&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),2,j,iband))
+&ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),1,j,iband)*&
+&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),2,j,iband))
       enddo
     enddo
   enddo
@@ -207,8 +207,8 @@ x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
   !Block 1 upto phys lim
   !Fourier
   iband = 1 ! (2)
-  do j = physlim_bot+1,jlim(2,grid,iband)
-    do column = 1,columns_num(iband,myid)
+  do j = physlim_bot+1,jlim(2,grid)
+    do column = 1,columns_num(myid)
       !Taking NS
       x(iband)%f(j,column) = (x(iband)%f(j,column)-ay(1,1,j,iband)*x(iband)%f(j-1,column))*ay(1,2,j,iband)
     enddo
@@ -218,7 +218,7 @@ x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
   !Fourier
   iband = 2 ! (3)
   do j = physlim_bot+1,physlim_top
-    do column = 1,columns_num(iband,myid)
+    do column = 1,columns_num(myid)
       !Taking NS
       x(iband)%f(j,column) = (x(iband)%f(j,column)-ay(1,1,j,iband)*x(iband)%f(j-1,column))*ay(1,2,j,iband)
     enddo
@@ -227,8 +227,8 @@ x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
   !Block 3 upto phys lim
   !Fourier
   iband = 3 ! (4)
-  do j = jlim(1,grid,iband)+1,physlim_top
-    do column = 1,columns_num(iband,myid)
+  do j = jlim(1,grid)+1,physlim_top
+    do column = 1,columns_num(myid)
       !Taking NS
       x(iband)%f(j,column) = (x(iband)%f(j,column)-ay(1,1,j,iband)*x(iband)%f(j-1,column))*ay(1,2,j,iband)
     enddo
@@ -247,15 +247,15 @@ x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
   !Blocks 2 & 3 upto top
   !Physical
   do iband = 2,3 ! (5)
-    do j = physlim_top+1,jlim(2,grid,iband)
-      do column = 1,columns_num(iband,myid)
+    do j = physlim_top+1,jlim(2,grid)
+      do column = 1,columns_num(myid)
         !NS or FS
 x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),1,j,iband)*&
-&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),2,j,iband))&
+&ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),1,j,iband)*&
+&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),2,j,iband))&
 &+im*aimag((x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),1,j,iband)*&
-&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),2,j,iband))
+&ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),1,j,iband)*&
+&x(iband)%f(j-1,column))*ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),2,j,iband))
       enddo
     enddo
   enddo
@@ -264,13 +264,13 @@ x(iband)%f(j,column) = real((x(iband)%f(j,column)-&
   !Blocks 2 & 3 down to physlim_top
   !Physical
   do iband = 2,3 ! (6)
-    do j = jlim(2,grid,iband)-1,physlim_top,-1
-      do column = 1,columns_num(iband,myid)
+    do j = jlim(2,grid)-1,physlim_top,-1
+      do column = 1,columns_num(myid)
         !NS or FS
 x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),3,j,iband)*x(iband)%f(j+1,column))&
+&ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),3,j,iband)*x(iband)%f(j+1,column))&
 &+im*aimag(x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),3,j,iband)*x(iband)%f(j+1,column))
+&ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),3,j,iband)*x(iband)%f(j+1,column))
       enddo
     enddo
   enddo
@@ -288,8 +288,8 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
   !Block 3 down to end
   !Fourier
   iband = 3 ! (7)
-  do j = physlim_top-1,jlim(1,grid,iband),-1
-    do column = 1,columns_num(iband,myid)
+  do j = physlim_top-1,jlim(1,grid),-1
+    do column = 1,columns_num(myid)
       !Taking NS
       x(iband)%f(j,column) =  x(iband)%f(j,column)-ay(1,3,j,iband)*x(iband)%f(j+1,column)
     enddo
@@ -299,7 +299,7 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
   !Fourier
   iband = 2 ! (8)
   do j = physlim_top-1,physlim_bot,-1
-    do column = 1,columns_num(iband,myid)
+    do column = 1,columns_num(myid)
       x(iband)%f(j,column) =  x(iband)%f(j,column)-ay(1,3,j,iband)*x(iband)%f(j+1,column)
     enddo
   enddo
@@ -307,8 +307,8 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
   !Block 1 down to physlim_bot
   !Fourier
   iband = 1 ! (9)
-  do j = jlim(2,grid,iband)-1,physlim_bot,-1
-    do column = 1,columns_num(iband,myid)
+  do j = jlim(2,grid)-1,physlim_bot,-1
+    do column = 1,columns_num(myid)
       x(iband)%f(j,column) =  x(iband)%f(j,column)-ay(1,3,j,iband)*x(iband)%f(j+1,column)
     enddo
   enddo
@@ -326,13 +326,13 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
   !Blocks 1 & 2 down to bottom
   !Physical
   do iband = 1,2 ! (10)
-    do j = physlim_bot-1,jlim(1,grid,iband),-1
-      do column = 1,columns_num(iband,myid)
+    do j = physlim_bot-1,jlim(1,grid),-1
+      do column = 1,columns_num(myid)
          !NS or FS
 x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+1,columns_k(column,iband,myid)),3,j,iband)*x(iband)%f(j+1,column))&
+&ay(planeBC(2*columns_i(column,myid)+1,columns_k(column,myid)),3,j,iband)*x(iband)%f(j+1,column))&
 +im*aimag(x(iband)%f(j,column)-&
-&ay(planeBC(2*columns_i(column,iband,myid)+2,columns_k(column,iband,myid)),3,j,iband)*x(iband)%f(j+1,column))
+&ay(planeBC(2*columns_i(column,myid)+2,columns_k(column,myid)),3,j,iband)*x(iband)%f(j+1,column))
       enddo
     enddo
   enddo
@@ -340,8 +340,8 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
    
    xPL=0d0
    !FFT remaining planes to Fourier
-   call modes_to_planes_phys_lims(xPL,x,jlim(1,grid,2),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
-   call modes_to_planes_phys_lims(xPL,x,physlim_top+1,jlim(2,grid,2),grid,myid,bandPL_FFT(myid),status,ierr)
+   call modes_to_planes_phys_lims(xPL,x,jlim(1,grid),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
+   call modes_to_planes_phys_lims(xPL,x,physlim_top+1,jlim(2,grid),grid,myid,bandPL_FFT(myid),status,ierr)
    do j=limPL_FFT(grid,1,myid),limPL_FFT(grid,2,myid)
      if(j<=physlim_bot)then
        call phys_to_four_N(xPL(1,1,j),bandPL_FFT(myid))
@@ -350,8 +350,8 @@ x(iband)%f(j,column) =  real(x(iband)%f(j,column)-&
        call phys_to_four_N(xPL(1,1,j),bandPL_FFT(myid))
      endif
    enddo
-   call planes_to_modes_phys_lims(x,xPL,jlim(1,grid,2),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
-   call planes_to_modes_phys_lims(x,xPL,physlim_top+1,jlim(2,grid,2),grid,myid,bandPL_FFT(myid),status,ierr)
+   call planes_to_modes_phys_lims(x,xPL,jlim(1,grid),physlim_bot,grid,myid,bandPL_FFT(myid),status,ierr)
+   call planes_to_modes_phys_lims(x,xPL,physlim_top+1,jlim(2,grid),grid,myid,bandPL_FFT(myid),status,ierr)
 
 ! -Original   
 !   do iband = sband,eband
@@ -401,18 +401,18 @@ subroutine LUsolV(x,grid,ufield,myid)
   real(8) , allocatable:: axz(:,:)
 
   !ay(BC,diag,j,iband)
-  allocate(ay(2,3,jlim(1,grid,2):jlim(2,grid,2),nband))
+  allocate(ay(2,3,jlim(1,grid):jlim(2,grid),nband))
   allocate(axz(maxval(columns_num),nband))
 
   do iband = sband,eband
-    call LU_build(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,axz,ay,ufield)
-    call LU_dec(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,ay(1,:,:,:))
+    call LU_build(jlim(1,grid),jlim(2,grid),grid,myid,iband,axz,ay,ufield)
+    call LU_dec(jlim(1,grid),jlim(2,grid),grid,myid,iband,ay(1,:,:,:))
     !call LU_dec(jlim(1,grid,iband),jlim(2,grid,iband),grid,myid,iband,ay(2,:,:,:))
   enddo
   
    do iband = sband,eband
-    do column = 1,columns_num(iband,myid)
-      do j=jlim(1,grid,iband)+1,jlim(2,grid,iband)-1 !C! Don't include first and last as BC's
+    do column = 1,columns_num(myid)
+      do j=jlim(1,grid)+1,jlim(2,grid)-1 !C! Don't include first and last as BC's
         x(iband)%f(j,column)=x(iband)%f(j,column)/axz(column,iband)
         
       enddo
@@ -421,12 +421,12 @@ subroutine LUsolV(x,grid,ufield,myid)
   
 ! -Original   
   do iband = sband,eband
-    do column = 1,columns_num(iband,myid)
-      x(iband)%f(jlim(1,grid,iband),column)=x(iband)%f(jlim(1,grid,iband),column)*ay(1,2,jlim(1,grid,iband),iband)
-      do j = jlim(1,grid,iband)+1,jlim(2,grid,iband)
+    do column = 1,columns_num(myid)
+      x(iband)%f(jlim(1,grid),column)=x(iband)%f(jlim(1,grid),column)*ay(1,2,jlim(1,grid),iband)
+      do j = jlim(1,grid)+1,jlim(2,grid)
         x(iband)%f(j,column) = (x(iband)%f(j,column)-ay(1,1,j,iband)*x(iband)%f(j-1,column))*ay(1,2,j,iband)
       end do
-      do j = jlim(2,grid,iband)-1,jlim(1,grid,iband),-1
+      do j = jlim(2,grid)-1,jlim(1,grid),-1
         x(iband)%f(j,column) =  x(iband)%f(j,column)-ay(1,3,j,iband)*x(iband)%f(j+1,column)
       end do
     end do
@@ -455,17 +455,17 @@ subroutine LUsolP(x,myid,iband,nystart,nyend)
   implicit none
   integer i,k,j,column,myid,iband
   integer nystart,nyend
-  complex(8) x(nystart:nyend,columns_num(iband,myid))
+  complex(8) x(nystart:nyend,columns_num(myid))
    
-  do column = 1,columns_num(iband,myid) 
-    i = columns_i(column,iband,myid)
-    k = columns_k(column,iband,myid)
-    x(nystart,column) = x(nystart,column)*DG(iband)%f_dg(2,nystart,column)
+  do column = 1,columns_num(myid) 
+    i = columns_i(column,myid)
+    k = columns_k(column,myid)
+    x(nystart,column) = x(nystart,column)*DG%f_dg(2,nystart,column)
     do j = nystart+1,nyend
-      x(j,column) = (x(j,column)-DG(iband)%f_dg(1,j,column)*x(j-1,column))*DG(iband)%f_dg(2,j,column)
+      x(j,column) = (x(j,column)-DG%f_dg(1,j,column)*x(j-1,column))*DG%f_dg(2,j,column)
     end do
     do j = nyend-1,nystart,-1
-      x(j,column) =  x(j,column)-DG(iband)%f_dg(3,j,column)*x(j+1,column)
+      x(j,column) =  x(j,column)-DG%f_dg(3,j,column)*x(j+1,column)
     end do
 
   end do
@@ -515,7 +515,7 @@ subroutine LU_build(nystart,nyend,grid,myid,iband,axz,ay,ufield)
   real(8) axz(maxval(columns_num),nband)
   
   !ay(BC,diag,j,iband)
-  real(8) ay(2,3,jlim(1,grid,iband):jlim(2,grid,iband),nband)
+  real(8) ay(2,3,jlim(1,grid):jlim(2,grid),nband)
 
   beta = bRK(kRK)*dt/Re
   
@@ -566,9 +566,9 @@ subroutine LU_build(nystart,nyend,grid,myid,iband,axz,ay,ufield)
     
   end if
         
-   do column = 1,columns_num(iband,myid) 
-     i = columns_i(column,iband,myid)
-     k = columns_k(column,iband,myid)
+   do column = 1,columns_num(myid) 
+     i = columns_i(column,myid)
+     k = columns_k(column,myid)
      k2x = k2F_x(i)
      k2z = k2F_z(k)
      axz(column,iband)=1-beta*(k2x+k2z)
@@ -577,14 +577,14 @@ subroutine LU_build(nystart,nyend,grid,myid,iband,axz,ay,ufield)
 
 end subroutine
 !  
-subroutine LU_buildP(nystart,nyend,myid,iband,a)
+subroutine LU_buildP(nystart,nyend,myid,a)
 !-------------------------------------------------------!
 !       specifies original values of a(1:3,j,i,k)       !
 !-------------------------------------------------------!
 
   use declaration
   implicit none
-  type(rfield_dg)  a(sband:eband)
+  type(rfield_dg)  a
   integer column,i,k,j,myid,iband
   integer nystart,nyend
   real(8) k2x,k2z
@@ -602,9 +602,9 @@ subroutine LU_buildP(nystart,nyend,myid,iband,a)
   end do
   
   
-  do column = 1,columns_num(iband,myid)
-    i = columns_i(column,iband,myid)
-    k = columns_k(column,iband,myid)
+  do column = 1,columns_num(myid)
+    i = columns_i(column,myid)
+    k = columns_k(column,myid)
     
     !For exact wavenumbers
      k2x = k2F_x(i) 
@@ -614,23 +614,23 @@ subroutine LU_buildP(nystart,nyend,myid,iband,a)
 !    k2x = k1F_x(i)*k1F_x(i) 
 !    k2z = k1F_z(k)*k1F_z(k)
    
-    a(iband)%f_dg(2,nystart,column) = (D_vec_t(nystart)*G_vec_b(nystart  )) + k2x + k2z
-    a(iband)%f_dg(3,nystart,column) = (D_vec_t(nystart)*G_vec_t(nystart+1))
-    a(iband)%f_dg(2,nyend,  column) = (D_vec_b(nyend-1)*G_vec_t(nyend    )) + k2x + k2z
-    a(iband)%f_dg(1,nyend,  column) = (D_vec_b(nyend-1)*G_vec_b(nyend-1  ))
+    a%f_dg(2,nystart,column) = (D_vec_t(nystart)*G_vec_b(nystart  )) + k2x + k2z
+    a%f_dg(3,nystart,column) = (D_vec_t(nystart)*G_vec_t(nystart+1))
+    a%f_dg(2,nyend,  column) = (D_vec_b(nyend-1)*G_vec_t(nyend    )) + k2x + k2z
+    a%f_dg(1,nyend,  column) = (D_vec_b(nyend-1)*G_vec_b(nyend-1  ))
     do j = nystart+1,nyend-1
-      a(iband)%f_dg(2,j,column) = (D_vec_b(j-1)*G_vec_t(j  )) + (D_vec_t(j)*G_vec_b(j)) + k2x + k2z
-      a(iband)%f_dg(1,j,column) = (D_vec_b(j-1)*G_vec_b(j-1))
-      a(iband)%f_dg(3,j,column) = (D_vec_t(j  )*G_vec_t(j+1))
+      a%f_dg(2,j,column) = (D_vec_b(j-1)*G_vec_t(j  )) + (D_vec_t(j)*G_vec_b(j)) + k2x + k2z
+      a%f_dg(1,j,column) = (D_vec_b(j-1)*G_vec_b(j-1))
+      a%f_dg(3,j,column) = (D_vec_t(j  )*G_vec_t(j+1))
     end do
 
   end do
   
   if(myid==0)then
     if(iband==midband)then 
-      a(iband)%f_dg(1,nystart,1) = 0d0
-      a(iband)%f_dg(2,nystart,1) = 1d0/((yu(1+1)-yu(1)))**2 !C!
-      a(iband)%f_dg(3,nystart,1) = 0d0
+      a%f_dg(1,nystart,1) = 0d0
+      a%f_dg(2,nystart,1) = 1d0/((yu(1+1)-yu(1)))**2 !C!
+      a%f_dg(3,nystart,1) = 0d0
     end if
   end if
 
@@ -646,10 +646,86 @@ subroutine LU_buildP(nystart,nyend,myid,iband,a)
 !  enddo
   
 
-  call LU_decP(nystart,nyend,columns_num(iband,myid),a(iband)%f_dg(:,nystart:nyend,1:columns_num(iband,myid)),iband,myid)
+  call LU_decP(nystart,nyend,columns_num(myid),a%f_dg(:,nystart:nyend,1:columns_num(myid)),myid)
 
   
 end subroutine
+
+! subroutine LU_buildP(nystart,nyend,myid,iband,a) O
+! !---------------------------------------------------------------!
+! !       specifies original values of a(1:3,j,i,k)       OLDDD   !
+! !---------------------------------------------------------------!
+
+!   use declaration
+!   implicit none
+!   type(rfield_dg)  a(sband:eband)
+!   integer column,i,k,j,myid,iband
+!   integer nystart,nyend
+!   real(8) k2x,k2z
+
+!   real(8) D_vec_b(nystart-1:nyend+1)
+!   real(8) G_vec_b(nystart-1:nyend+1)
+!   real(8) D_vec_t(nystart-1:nyend+1)
+!   real(8) G_vec_t(nystart-1:nyend+1)
+
+!   do j = nystart,nyend
+!       D_vec_b(j-1) = -ddthetavi*dthdyu(j)
+!       G_vec_b(j  ) = -ddthetavi*dthdyv(j)
+!       D_vec_t(j  ) =  ddthetavi*dthdyu(j)
+!       G_vec_t(j+1) =  ddthetavi*dthdyv(j)
+!   end do
+  
+  
+!   do column = 1,columns_num(iband,myid)
+!     i = columns_i(column,iband,myid)
+!     k = columns_k(column,iband,myid)
+    
+!     !For exact wavenumbers
+!      k2x = k2F_x(i) 
+!      k2z = k2F_z(k)
+    
+!     !For 2nd order centrered difference wavenumbers
+! !    k2x = k1F_x(i)*k1F_x(i) 
+! !    k2z = k1F_z(k)*k1F_z(k)
+   
+!     a(iband)%f_dg(2,nystart,column) = (D_vec_t(nystart)*G_vec_b(nystart  )) + k2x + k2z
+!     a(iband)%f_dg(3,nystart,column) = (D_vec_t(nystart)*G_vec_t(nystart+1))
+!     a(iband)%f_dg(2,nyend,  column) = (D_vec_b(nyend-1)*G_vec_t(nyend    )) + k2x + k2z
+!     a(iband)%f_dg(1,nyend,  column) = (D_vec_b(nyend-1)*G_vec_b(nyend-1  ))
+!     do j = nystart+1,nyend-1
+!       a(iband)%f_dg(2,j,column) = (D_vec_b(j-1)*G_vec_t(j  )) + (D_vec_t(j)*G_vec_b(j)) + k2x + k2z
+!       a(iband)%f_dg(1,j,column) = (D_vec_b(j-1)*G_vec_b(j-1))
+!       a(iband)%f_dg(3,j,column) = (D_vec_t(j  )*G_vec_t(j+1))
+!     end do
+
+!   end do
+  
+!   if(myid==0)then
+!     if(iband==midband)then 
+!       a(iband)%f_dg(1,nystart,1) = 0d0
+!       a(iband)%f_dg(2,nystart,1) = 1d0/((yu(1+1)-yu(1)))**2 !C!
+!       a(iband)%f_dg(3,nystart,1) = 0d0
+!     end if
+!   end if
+
+! ! For modified wavenumbers, need BC on last pressure mode (as k2x=k2z=0)
+! !  do column = 1,columns_num(iband,myid)
+! !  i = columns_i(column,iband,myid)
+! !  k = columns_k(column,iband,myid)
+! !  if(abs(k1F_x(i)*k1F_x(i))<10e-10.and.abs(k1F_z(k)*k1F_z(k))<10e-10)then
+! !  a(iband)%f_dg(1,nystart,column) = 0d0
+! !  a(iband)%f_dg(2,nystart,column) = 1d0/((yu(1+1)-yu(1)))**2 !C!
+! !  a(iband)%f_dg(3,nystart,column) = 0d0
+! !  endif
+! !  enddo
+  
+
+!   call LU_decP(nystart,nyend,columns_num(iband,myid),a(iband)%f_dg(:,nystart:nyend,1:columns_num(iband,myid)),iband,myid)
+
+  
+! end subroutine
+
+
 
 subroutine LU_build0(nystart,nyend,a)
 !----------------------------------------------------------------------*
@@ -667,13 +743,15 @@ subroutine LU_build0(nystart,nyend,a)
   beta = bRK(kRK)*dt/Re
   a(1,nystart) = 0d0
   a(2,nystart) = 1d0
-  a(3,nystart) = gridweighting(midband,1)!0d0 !ay(3,nystart)=0d0 !Free-shear -1 no-slip 0
+  a(3,nystart) = gridweighting(1)!0d0 !ay(3,nystart)=0d0 !Free-shear -1 no-slip 0
+                                    ! changed to no bnads bit this grid weighitn gused to be midband. 
+                                    ! whyyy?!?!?! can i change...?!?!?!
   do j = nystart+1,nyend-1
     a(1,j) =    -beta*dyu2i(1,j)
     a(2,j) = 1d0-beta*dyu2i(2,j)
     a(3,j) =    -beta*dyu2i(3,j)
   end do
-  a(1,nyend) = gridweighting(midband,2)!0d0 !ay(3,nystart)=0d0 !Free-shear -1 no-slip 0
+  a(1,nyend) = gridweighting(2)!0d0 !ay(3,nystart)=0d0 !Free-shear -1 no-slip 0
   a(2,nyend) = 1d0
   a(3,nyend) = 0d0
 
@@ -708,7 +786,7 @@ subroutine LU_dec(nystart,nyend,grid,myid,iband,ay)
   implicit none
   integer j,column,iband,myid,grid
   integer nystart,nyend
-  real(8) ay(3,jlim(1,grid,2):jlim(2,grid,2),nband)
+  real(8) ay(3,jlim(1,grid):jlim(2,grid),nband)
 
     ay(2,nystart,iband) = 1d0/ay(2,nystart,iband)
     do j = nystart+1,nyend

@@ -33,6 +33,16 @@
 !                     - )Or sets up parabolic profile)
 !        init_stats - Called from getini : 
 !                     - Initialises statistics
+
+!         
+!             start  - done, mostly checked, LUBuild etc cold be a bit dodge 
+!             ygrid  - done and chcked 
+!             def_k  - done and checked 
+!         getbounds  - commented out bc i believe we dont use but check...
+! proc_lims_columns  - done and checked 
+!  proc_lims_planes  - done, check the weighting 
+!            getini  - done , needs checking check why flowrate used midband
+!        init_stats  - not touched (check what ju is) otherwise all good i think 
 !
 !
 ! *************************************************************************************************************** !
@@ -493,22 +503,36 @@ end if
   ! Computes planelim, bandPL, crossband and dk 
   ! Computes sband and eband
   !call proc_lims(myid)
+  !write(6,*) "proc lims cols"
   call proc_lims_columns(myid)
+
+  !! added nonlin read here so read before allocating proc_lims_planes
+
+  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+  if (myid == 0) then
+    write(*,*) 'Reading in nonlinear interaction list'
+    write(*,*) dirlist
+    write(*,*)
+  end if
+  call nonlinRead
+  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+  !write(*,*) 'finished reading nonlinear interaction list'
+
+  write(6,*) "proc lims planes"
   call proc_lims_planes (myid)
+  !write(6,*) "finished proc lims planes"
 
-  block
-    integer :: r
-    do r = 0, np-1
-      call MPI_Barrier(MPI_COMM_WORLD, ierr)
-      if (myid == r) then
-        write(6,'("band=",I3,2X,"mpi=",I3,2X,"planes",2I6)') &
-          bandpl(myid), myid, planelim(ugrid,1,myid), planelim(ugrid,2,myid)
-
-        call flush(6)
-      end if
-    end do
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
-  end block
+  ! block
+  !   integer :: r
+  !   do r = 0, np-1
+  !     call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  !     if (myid == r) then
+  !       write(6,*) "myid", myid, planelim(ugrid,1,myid), planelim(ugrid,2,myid)
+  !       call flush(6)
+  !     end if
+  !   end do
+  !   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  ! end block
 
   ! This function send to every proc a list containing points (and weights) of the immersed boundary.
   !  If the planes a proc has to solve are in the middle of the channel, the don't have to deal with the
@@ -516,67 +540,85 @@ end if
   ! list_ib      stores the 'solid' points at the immersed boundary
   ! A_ib         stores the weights
   ! nyIB1, nyIB2 store  the planes that contain 'solid' point for a certain proc 
-  call getbounds(myid,status,ierr)
+
+
+  ! call getbounds(myid,status,ierr) ! pre sure i can comment it out but check !!!
 
   ! dnz = nb of points per tile
-  if (geometry_type /= 0) then
-!     dnx = Ngal(1,1)/ntilex
-!     dnz = Ngal(2,1)/ntilez
-    dnx = N(1,1)/ntilex
-    dnz = N(2,1)/ntilez
-    print *, "dnx/z N"
-  else
-    dnx = 0
-    dnz = 0
-  end if
+!   if (geometry_type /= 0) then
+! !     dnx = Ngal(1,1)/ntilex
+! !     dnz = Ngal(2,1)/ntilez
+!     dnx = N(1,1)/ntilex
+!     dnz = N(2,1)/ntilez
+!     print *, "dnx/z N"
+!   else
+!     dnx = 0
+!     dnz = 0
+!   end if 
+
+  dnx = 0
+  dnz = 0
+ 
 
   ! Creates a vector of indices with an extra tile and the peoriodicity.
   ! Ex: Ngal = 10, tilez = 3 -> indkor(0:11) = [10,1,2,...,10,1]
   ! It's only used in stats.f90 and only in bands 1 and 3 (phys)
-  allocate(indkor(-dnz/2+1:Ngal(2,1)+dnz/2))
-  do k = -dnz/2+1,0
-    indkor(k) = k + Ngal(2,1)
-  end do
-  do k = 1,Ngal(2,1)
+  allocate(indkor(1:Ngal(2,nband)))
+  ! do k = 1,0
+  !   indkor(k) = k + Ngal(2,nband)
+  ! end do
+  ! do k = 1,Ngal(2,nband)
+  !   indkor(k) = k
+  ! end do
+  ! do k = Ngal(2,nband)+1,Ngal(2,nband)
+  !   indkor(k) = k - Ngal(2,nband)
+  ! end do
+
+
+  do k = 1,Ngal(2,nband)
     indkor(k) = k
   end do
-  do k = Ngal(2,1)+1,Ngal(2,1)+dnz/2
-    indkor(k) = k - Ngal(2,1)
-  end do
-  allocate(indior(-dnx/2+1:Ngal(1,1)+dnx/2))
+  
+  !write(6,*) "indkor", indkor(1:Ngal(2,1))
+
+
+  allocate(indior(1:Ngal(1,nband)))
   do i = -dnx/2+1,0
-    indior(i) = i + Ngal(1,1)
+    indior(i) = i + Ngal(1,nband)
   end do
-  do i = 1,Ngal(1,1)
+  do i = 1,Ngal(1,nband)
     indior(i) = i
   end do
-  do i = Ngal(1,1)+1,Ngal(1,1)+dnx/2
-    indior(i) = i - Ngal(1,1)
+  do i = Ngal(1,nband)+1,Ngal(1,nband)+dnx/2
+    indior(i) = i - Ngal(1,nband)
   end do
 
-  ! Grid weighting for extrapolating and interpolating the ghost points at the wall
-  allocate(gridweighting(nband,2))
-  gridweighting(botband,1) =-(yv(N(3,0)  )-yu(N(4,0)  ))/(yv(N(3,0)  )-yu(N(4,0)+1)) !band 1 bottom
-  gridweighting(botband,2) = (yu(N(4,1)+1)-yv(N(3,1)+1))/(yv(N(3,1)+1)-yu(N(4,1)  )) !band 1 top
-  gridweighting(midband,1) =-(yv(N(3,0)  )-yu(N(4,0)  ))/(yv(N(3,0)  )-yu(N(4,0)+1)) !band 2 bottom
-  gridweighting(midband,2) = (yu(N(4,3)+1)-yv(N(3,3)+1))/(yv(N(3,3)+1)-yu(N(4,3)  )) !band 2 top
-  gridweighting(topband,1) =-(yv(N(3,2)  )-yu(N(4,2)  ))/(yv(N(3,2)  )-yu(N(4,2)+1)) !band 3 bottom
-  gridweighting(topband,2) = (yu(N(4,3)+1)-yv(N(3,3)+1))/(yv(N(3,3)+1)-yu(N(4,3)  )) !band 3 top
-    
+  
+  !write(6,*) "doing grid weighting"
+
+  ! Grid weighting for extrapolating and interpolating the ghost points at the wall 
+  !(doesnt look like its used), also eqn doesnt make sense
+  allocate(gridweighting(2))
+  gridweighting(1) =-(yv(N(3,0)  )-yu(N(4,0)  ))/(yv(N(3,0)  )-yu(N(4,0)+1)) 
+  gridweighting(2) = (yu(N(4,nband)+1)-yv(N(3,nband)+1))/(yv(N(3,nband)+1)-yu(N(4,nband)  )) 
+
+  !write(6,*) "gridweighting", gridweighting(1), gridweighting(2)
+
   gridweighting_bc_u1 = ((yu(0)-yv(0)) + bslpu1*ddthetavi*dthdyv(0)*(yu(1)-yu(0)))&
   &/((yu(1)-yv(0))+bslpu1*ddthetavi*dthdyv(0)*(yu(1)-yu(0)))
+
 
   gridweighting_bc_u3 = ((yu(0)-yv(0)) + bslpu3*ddthetavi*dthdyv(0)*(yu(1)-yu(0)))&
   &/((yu(1)-yv(0))+bslpu3*ddthetavi*dthdyv(0)*(yu(1)-yu(0)))
 
+
+
   ! Used in interp_v and v_corr
-  allocate(gridweighting_interp(nband,2))
-  gridweighting_interp(botband,1) = (yu(N(4,0)  )-yu(N(4,0)+1))/(yv(N(3,0)  )-yu(N(4,0)+1))
-  gridweighting_interp(midband,1) = (yu(N(4,0)  )-yu(N(4,0)+1))/(yv(N(3,0)  )-yu(N(4,0)+1))
-  gridweighting_interp(topband,1) = (yu(N(4,2)  )-yu(N(4,2)+1))/(yv(N(3,2)  )-yu(N(4,2)+1))
-  gridweighting_interp(botband,2) = (yu(N(4,1)+1)-yu(N(4,1)  ))/(yv(N(3,1)+1)-yu(N(4,1)  ))
-  gridweighting_interp(midband,2) = (yu(N(4,3)+1)-yu(N(4,3)  ))/(yv(N(3,3)+1)-yu(N(4,3)  ))
-  gridweighting_interp(topband,2) = (yu(N(4,3)+1)-yu(N(4,3)  ))/(yv(N(3,3)+1)-yu(N(4,3)  ))
+  allocate(gridweighting_interp(2))
+  gridweighting_interp(1) = (yu(N(4,0)  )-yu(N(4,0)+1))/(yv(N(3,0)  )-yu(N(4,0)+1))
+  gridweighting_interp(2) = (yu(N(4,nband)+1)-yu(N(4,nband)  ))/(yv(N(3,nband)+1)-yu(N(4,nband)  ))
+
+  ! write(6,*) "gridweighting_interp", gridweighting_interp(1), gridweighting_interp(2)
 
   ! PL = PLane
   ! By default variables are stored in columns
@@ -602,90 +644,137 @@ end if
   allocate(wu_cPL      (igal,kgal,jgal(ugrid,1)-1:jgal(ugrid,2)+1))
   allocate(wv_fPL      (igal,kgal,jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   allocate(ww_cPL      (igal,kgal,jgal(ugrid,1)-1:jgal(ugrid,2)+1))
+
+  ! du1dy_planes( nx, nz, jplanes of each MPI rank)
   
-  allocate(du1dy_planes(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(du2dy_planes(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(du3dy_planes(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du1dy_planes(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du2dy_planes(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du3dy_planes(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+
   
-  allocate(du1dy_planes2(Ngal(1,bandPL(myid))+2,Ngal(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(du2dy_planes2(Ngal(1,bandPL(myid))+2,Ngal(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(du3dy_planes2(Ngal(1,bandPL(myid))+2,Ngal(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du1dy_planes2(Ngal(1,nband)+2,Ngal(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du2dy_planes2(Ngal(1,nband)+2,Ngal(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du3dy_planes2(Ngal(1,nband)+2,Ngal(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   
   !allocate(Qcrit(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   !allocate(Qcrit(N(1,2)+2,N(2,2),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   
   allocate(Qcrit(Ngal(1,2)+2,Ngal(2,2),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   
-  allocate( u1PLN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
-  allocate( u2PLN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate( u3PLN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
-  allocate( u1PL_itpN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate( u2PL_itpN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
-  allocate( u3PL_itpN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate( ppPLN(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(pgrid,1)-1:jgal(pgrid,2)+1))
+  allocate( u1PLN(N(1,nband)+2,N(2,nband),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
+  allocate( u2PLN(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate( u3PLN(N(1,nband)+2,N(2,nband),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
+  allocate( u1PL_itpN(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate( u2PL_itpN(N(1,nband)+2,N(2,nband),jgal(ugrid,1)-1:jgal(ugrid,2)+1))
+  allocate( u3PL_itpN(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate( ppPLN(N(1,nband)+2,N(2,nband),jgal(pgrid,1)-1:jgal(pgrid,2)+1))
   
-  allocate(u1_itp(sband:eband))
-  allocate(u2_itp(sband:eband))
-  allocate(u3_itp(sband:eband))
-  allocate(Nu1_dy(sband:eband))
-  allocate(Nu2_dy(sband:eband))
-  allocate(Nu3_dy(sband:eband))
-  allocate(uv_f  (sband:eband))
-  allocate(wv_f  (sband:eband))
-  allocate(vv_c  (sband:eband))
-  allocate(DG    (sband:eband))
-  allocate(du1dy_columns(sband:eband))
-  allocate(du2dy_columns(sband:eband))
-  allocate(du3dy_columns(sband:eband))
+  ! allocate(u1_itp(sband:eband))
+  ! allocate(u2_itp(sband:eband))
+  ! allocate(u3_itp(sband:eband))
+  ! allocate(Nu1_dy(sband:eband))
+  ! allocate(Nu2_dy(sband:eband))
+  ! allocate(Nu3_dy(sband:eband))
+  ! allocate(uv_f  (sband:eband))
+  ! allocate(wv_f  (sband:eband))
+  ! allocate(vv_c  (sband:eband))
+  ! allocate(DG    (sband:eband))
+  ! allocate(du1dy_columns(sband:eband))
+  ! allocate(du2dy_columns(sband:eband))
+  ! allocate(du3dy_columns(sband:eband))
   
-  do iband = sband,eband
-    allocate( u1_itp      (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate( u2_itp      (iband)%f   (  jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(myid)))
-    allocate( u3_itp      (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate(Nu1_dy       (iband)%f   (  jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(myid)))
-    allocate(Nu2_dy       (iband)%f   (  jlim(1,vgrid)+1:jlim(2,vgrid)-1,columns_num(myid)))
-    allocate(Nu3_dy       (iband)%f   (  jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(myid)))
-    allocate( uv_f        (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate( vv_c        (iband)%f   (  jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(myid)))
-    allocate( wv_f        (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate( DG          (iband)%f_dg(3,jlim(1,pgrid)  :jlim(2,pgrid)  ,columns_num(myid)))
-    allocate(du1dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate(du2dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-    allocate(du3dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
-  end do
+  ! do iband = sband,eband
+  !   allocate( u1_itp      (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate( u2_itp      (iband)%f   (  jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(myid)))
+  !   allocate( u3_itp      (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate(Nu1_dy       (iband)%f   (  jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(myid)))
+  !   allocate(Nu2_dy       (iband)%f   (  jlim(1,vgrid)+1:jlim(2,vgrid)-1,columns_num(myid)))
+  !   allocate(Nu3_dy       (iband)%f   (  jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(myid)))
+  !   allocate( uv_f        (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate( vv_c        (iband)%f   (  jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(myid)))
+  !   allocate( wv_f        (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate( DG          (iband)%f_dg(3,jlim(1,pgrid)  :jlim(2,pgrid)  ,columns_num(myid)))
+  !   allocate(du1dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate(du2dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  !   allocate(du3dy_columns(iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
+  ! end do
 
-  do iband = sband,eband
-    u1_itp(iband)%f        = 0d0
-    u2_itp(iband)%f        = 0d0
-    u3_itp(iband)%f        = 0d0
-    Nu1_dy(iband)%f        = 0d0
-    Nu2_dy(iband)%f        = 0d0
-    Nu3_dy(iband)%f        = 0d0
-    uv_f  (iband)%f        = 0d0
-    wv_f  (iband)%f        = 0d0
-    vv_c  (iband)%f        = 0d0
-    DG    (iband)%f_dg     = 0d0
-    du1dy_columns(iband)%f = 0d0
-    du3dy_columns(iband)%f = 0d0
-  end do
+  ! One field per proc (not per band)
+
+  allocate( u1_itp%f( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+  allocate( u2_itp%f( jlim(1,ugrid):jlim(2,ugrid), columns_num(myid) ) )
+  allocate( u3_itp%f( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+
+  allocate( Nu1_dy%f( jlim(1,ugrid)+1:jlim(2,ugrid)-1, columns_num(myid) ) )
+  allocate( Nu2_dy%f( jlim(1,vgrid)+1:jlim(2,vgrid)-1, columns_num(myid) ) )
+  allocate( Nu3_dy%f( jlim(1,ugrid)+1:jlim(2,ugrid)-1, columns_num(myid) ) )
+
+  allocate( uv_f%f ( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+  allocate( vv_c%f ( jlim(1,ugrid):jlim(2,ugrid), columns_num(myid) ) )
+  allocate( wv_f%f ( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+
+  allocate( DG%f_dg( 3, jlim(1,pgrid):jlim(2,pgrid), columns_num(myid) ) )
+
+  allocate( du1dy_columns%f( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+  allocate( du2dy_columns%f( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+  allocate( du3dy_columns%f( jlim(1,vgrid):jlim(2,vgrid), columns_num(myid) ) )
+
+
+  ! do iband = sband,eband
+  !   u1_itp(iband)%f        = 0d0
+  !   u2_itp(iband)%f        = 0d0
+  !   u3_itp(iband)%f        = 0d0
+  !   Nu1_dy(iband)%f        = 0d0
+  !   Nu2_dy(iband)%f        = 0d0
+  !   Nu3_dy(iband)%f        = 0d0
+  !   uv_f  (iband)%f        = 0d0
+  !   wv_f  (iband)%f        = 0d0
+  !   vv_c  (iband)%f        = 0d0
+  !   DG    (iband)%f_dg     = 0d0
+  !   du1dy_columns(iband)%f = 0d0
+  !   du3dy_columns(iband)%f = 0d0
+  ! end do
+
+  u1_itp%f        = 0d0
+  u2_itp%f        = 0d0
+  u3_itp%f        = 0d0
+
+  Nu1_dy%f        = 0d0
+  Nu2_dy%f        = 0d0
+  Nu3_dy%f        = 0d0
+
+  uv_f%f          = 0d0
+  wv_f%f          = 0d0
+  vv_c%f          = 0d0
+
+  DG%f_dg         = 0d0
+
+  du1dy_columns%f = 0d0
+  du2dy_columns%f = 0d0
+  du3dy_columns%f = 0d0
+
+
 
   !C! Matrix fir the laplacian of the pressure
   !Build (and decompose) matirx - only needs to be done once
   
+  ! write(6,*) "Calling LU_buildP"
 
-  do iband = sband,eband
-    call LU_buildP(jlim(1,pgrid),jlim(2,pgrid),myid,iband,DG)
-  enddo
+  call LU_buildP(jlim(1,pgrid),jlim(2,pgrid),myid,DG)
+
+  ! write(6,*) "finished LU_buildP"
   
   
-   allocate(du1PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
-   allocate(du2PL(igal,kgal,nyvIB1(myid):nyvIB2(myid)))
-   allocate(du3PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
+  !  allocate(du1PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
+  !  allocate(du2PL(igal,kgal,nyvIB1(myid):nyvIB2(myid)))
+  !  allocate(du3PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
 
   !allocate(   wx(igal,kgal,jgal(vgrid,1)-1  :jgal(vgrid,2)+1  ))
   allocate(   wx(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1  :jgal(vgrid,2)+1  ))
 
-  iband = midband
+
+  ! write(6,*) " STallocating final bits "
+  ! iband = midband
   allocate(spU (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid)))
   allocate(spV (jlim(1,vgrid):jlim(2,vgrid),columns_num(myid)))
   allocate(spW (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid)))
@@ -699,15 +788,17 @@ end if
 
   
 
-  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  if (myid == 0) then
-    write(*,*) 'Reading in nonlinear interaction list'
-    write(*,*) dirlist
-    write(*,*)
-  end if
-  call nonlinRead
-  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+  ! call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+  ! if (myid == 0) then
+  !   write(*,*) 'Reading in nonlinear interaction list'
+  !   write(*,*) dirlist
+  !   write(*,*)
+  ! end if
+  ! call nonlinRead
+  ! call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
+
+  ! write(6,*) "FINISHED START"
 end subroutine
 
 ! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1463,10 +1554,10 @@ subroutine ygrid
   Ngal(3,top_domain) = N(3,top_domain)
   Ngal(4,top_domain) = N(4,top_domain)
 
-  write(6,*) "N:"
-  do i = 1,4
-    write(6,*) N(i,0:4)
-  end do
+  ! write(6,*) "N:"
+  ! do i = 1,4
+  !   write(6,*) N(i,0:4)
+  ! end do
   
   Ny = 0
 
@@ -2482,18 +2573,18 @@ subroutine proc_lims_columns(myid)
   ! jlim(1,ugrid) = N(4,2)
   ! jlim(2,ugrid) = N(4,nband)+1
 
-  write(*,*) 'jlim(1, ugrid)=', N(4,0), ' jlim(2, ugrid)=', N(4,nband)+1
+  ! write(*,*) 'jlim(1, ugrid)=', N(4,0), ' jlim(2, ugrid)=', N(4,nband)+1
 
   ! v
   jlim(1,vgrid) = N(3,0)
   jlim(2,vgrid) = N(3,nband)+1 
 
-  write(*,*) 'jlim(1, vgrid)=', N(3,0), ' jlim(2, vgrid)=', N(3,nband)+1
+  ! write(*,*) 'jlim(1, vgrid)=', N(3,0), ' jlim(2, vgrid)=', N(3,nband)+1
 
   ! p: Ghost points not included
   jlim(1,pgrid) = N(4,0)+1
   jlim(2,pgrid) = N(4,nband)
-  write(*,*) 'jlim(1, pgrid)=',N(4,0)+1, ' jlim(2, pgrid)=', N(4,nband)
+  ! write(*,*) 'jlim(1, pgrid)=',N(4,0)+1, ' jlim(2, pgrid)=', N(4,nband)
 
   ! Used in FOU3D and stats
   ! It's a shift in z, used to align modes in different bands
@@ -2526,65 +2617,74 @@ subroutine proc_lims_columns(myid)
           end if
     end do
   end do
-  
-  !Define Boundary condition lists for SHS
-  if(geometry_type==1)then
-    !1 - No-slip
-    !2 - Free-shear
-  
-    allocate(planeBC(0:(N(1,1)+2),N(2,1)))
-  
-    planeBC = 2 !2 - Free-shear
 
-    texturepointsx = (N(1,1))/ntilex
-    texturepointsz = N(2,1)/ntilez
-    
-    if(Lfracx==0.and.Lfracz==0)then
-      postpointsx = texturepointsx
-      postpointsz = texturepointsz
-    else
-  
-      if(mod((N(1,1)/2d0/ntilex/Lfracx)+1,1d0)/=0)then
-	print *, "Post x problem...", N(1,1)/2d0/ntilex/Lfracx+1,N(1,1)/2d0,ntilex,Lfracx
-	stop
-      endif
-  
-      if(mod((N(2,1)/ntilez/Lfracz)+1,1d0)/=0)then
-	print *, "Post z problem...", N(2,1)/ntilez/Lfracz+1,N(1,1),ntilez,Lfracz
-	stop
-      endif
-  
-    postpointsx = (N(1,1)/ntilex/Lfracx)+1
-    postpointsz = (N(2,1)/ntilez/Lfracz)+1
-    
-    endif
-  
-    if(postpointsz>N(2,1))then
-      postpointsz=N(2,1) !overflow check...
-    endif
-  
-    !Create geometry for 1 post
-    do i=1,postpointsx
-      do k=1,postpointsz
-	planeBC(i,k) = 1 !1 - No-slip
-      enddo
-    enddo 
-  
-    !Duplicate for all posts
-    do ip=1,ntilex
-      do kp=1,ntilez
-	do i=1,postpointsx
-	  do k=1,postpointsz
-	    planeBC(i+(ip-1)*texturepointsx,k+(kp-1)*texturepointsz) = planeBC(i,k)
-	  enddo        
-	enddo
-      enddo
-    enddo
+  ! do iproc = 0,np-1
+  !   do column = 1,columns_num(iproc)
+  !     if (columns_k(column,iproc) > N(2,nband)/2) then
+  !       write(6,*)'col_k=',columns_k(column,iproc), 'dk_phys=', dk_phys(column,iproc),"iproc", iproc
+  !     end if
+  !   end do
+  ! end do
 
-  endif
   
-!planeBC = 1 !2 - Free-shear
-!bslip = (0.535d0*6d0)/(180d0)
+!   !Define Boundary condition lists for SHS
+!   if(geometry_type==1)then
+!     !1 - No-slip
+!     !2 - Free-shear
+  
+!     allocate(planeBC(0:(N(1,1)+2),N(2,1)))
+  
+!     planeBC = 2 !2 - Free-shear
+
+!     texturepointsx = (N(1,1))/ntilex
+!     texturepointsz = N(2,1)/ntilez
+    
+!     if(Lfracx==0.and.Lfracz==0)then
+!       postpointsx = texturepointsx
+!       postpointsz = texturepointsz
+!     else
+  
+!       if(mod((N(1,1)/2d0/ntilex/Lfracx)+1,1d0)/=0)then
+! 	print *, "Post x problem...", N(1,1)/2d0/ntilex/Lfracx+1,N(1,1)/2d0,ntilex,Lfracx
+! 	stop
+!       endif
+  
+!       if(mod((N(2,1)/ntilez/Lfracz)+1,1d0)/=0)then
+! 	print *, "Post z problem...", N(2,1)/ntilez/Lfracz+1,N(1,1),ntilez,Lfracz
+! 	stop
+!       endif
+  
+!     postpointsx = (N(1,1)/ntilex/Lfracx)+1
+!     postpointsz = (N(2,1)/ntilez/Lfracz)+1
+    
+!     endif
+  
+!     if(postpointsz>N(2,1))then
+!       postpointsz=N(2,1) !overflow check...
+!     endif
+  
+!     !Create geometry for 1 post
+!     do i=1,postpointsx
+!       do k=1,postpointsz
+! 	planeBC(i,k) = 1 !1 - No-slip
+!       enddo
+!     enddo 
+  
+!     !Duplicate for all posts
+!     do ip=1,ntilex
+!       do kp=1,ntilez
+! 	do i=1,postpointsx
+! 	  do k=1,postpointsz
+! 	    planeBC(i+(ip-1)*texturepointsx,k+(kp-1)*texturepointsz) = planeBC(i,k)
+! 	  enddo        
+! 	enddo
+!       enddo
+!     enddo
+
+!   endif
+  
+! !planeBC = 1 !2 - Free-shear
+! !bslip = (0.535d0*6d0)/(180d0)
   
 end subroutine
 
@@ -2861,6 +2961,11 @@ end subroutine
   
 ! end subroutine
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!    PROC LIMS planes NEW   !!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 subroutine proc_lims_planes(myid)
   ! Calculates the different variables that define planes (phys) for every proc 
   ! Defines i-k-,j-gal, planelim and bandPL
@@ -2872,15 +2977,22 @@ subroutine proc_lims_planes(myid)
   implicit none
 
   integer :: myid
-  integer :: nplanes, iplanes
-  integer :: iband, iproc, rem
+  integer :: iplanes
+  integer :: iband, iproc, rem, i 
   real(8) :: loadT, loadP, maxload
-  real(8), allocatable:: load_band(:),i_load(:)
-  
-  integer :: proc_planes
+  real(8), allocatable :: load_band(:), i_load(:)
+  integer :: weight_tot, ideal_load
+
+  integer :: proc_planes, jlow, jupp
   integer :: rem_planes
 
-  allocate(load_band(nband),i_load(nband))
+  ! new declarations for your variables
+  integer :: j, p, cut_plane
+  real(8) :: cumulative_load, cumulative_load_1, cumulative_load_2
+  integer, allocatable :: jmin_plane(:), jmax_plane(:)
+  integer, allocatable :: proc_load(:), nplanes(:)
+
+  allocate(load_band(nband), i_load(nband))
   allocate(procs  (0:nband))
   allocate(procs_b(0:nband))
   allocate(procs_c(0:nband))
@@ -2890,227 +3002,125 @@ subroutine proc_lims_planes(myid)
   allocate(limPL_FFT(3,2,0:np-1))
   allocate(bandPL(0:np-1))
   allocate(bandPL_FFT(0:np-1))
-  
-  limPL_FFT = 9999
 
-  ! Computing mean load per proc
-  loadT = 0d0
-  do iband = 1,nband
-    ! Roughly the load of a band is equal to the number of points
-    load_band(iband) = (Ngal(1,iband)+2)*Ngal(2,iband)*(Ngal(4,iband)-N(4,iband-1)) ! Number of points (nx+2)*nz*ny(band)
-    loadT            = loadT + load_band(iband)
-  end do
-  loadP = loadT/np ! Load per proc
-  ! Assigns one proc per plane to the fine-grid bands
-  ! Ussually we'll run out of procs. This will be corrected in a following step
-  procs(0) = 0  ! Procs per band
-  rem      = 0
-  nplanes         = N(4,botband) - N(4,0)                     ! Nb of planes in a band (phys)
-  procs(botband)  = nplanes                                   ! One proc per plane (too greedy)
-  procs(topband)  = nplanes                                   !
-  rem             = rem + procs(botband) + procs(topband)
-  i_load(botband) = load_band(botband)/nplanes                ! Computational load per plane
-  i_load(topband) = load_band(topband)/nplanes                ! Computational load per plane
-  ! Assigns the remaining procs to the central band (which are coarser and thus less computing demanding)
-  nplanes         = N(4,midband) - N(4,botband)
-  procs(midband)  = np - rem
-  iplanes         = ceiling(nplanes*1d0/procs(midband))
-  i_load(midband) = load_band(midband)/nplanes*iplanes
-  ! Balance the load of procs.
-    ! Iterates till the central band has a positive number of procs
-    iplanes = 1
-    do while (procs(midband)<=0)
-      iplanes = iplanes + 1
-      rem = 0
-      nplanes = N(4,botband) - N(4,0)
-      procs(botband)  = ceiling(nplanes*1d0/iplanes)
-      procs(topband)  = procs(botband)
-      rem             = rem + procs(botband) + procs(topband)
-      i_load(botband) = load_band(botband)/nplanes*iplanes
-      i_load(topband) = load_band(topband)/nplanes*iplanes
-      nplanes         = N(4,midband) - N(4,botband)
-      procs(midband)  = np - rem
-      i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
-    end do
-    ! Few fine grid planes per proc, and more coarse grid planes such that the computing time is more or less the same
-    maxload = 2d0*maxval(i_load)
-    do while (maxval(i_load)<maxload)
-      iplanes = iplanes+1
-      maxload = maxval(i_load)
-      rem = 0
-      nplanes         = N(4,botband)-N(4,0)
-      procs(botband)  = ceiling(nplanes*1d0/iplanes)
-      procs(topband)  = procs(botband)
-      rem             = rem + procs(botband) + procs(topband)
-      i_load(botband) = load_band(botband)/nplanes*iplanes
-      i_load(topband) = load_band(topband)/nplanes*iplanes
-      nplanes         = N(4,midband) - N(4,botband)
-      procs(midband)  = np - rem
-      i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
-    end do
-    ! Once the load has been balanced, we go one step backwards to reduce a bit the load of the 'fine' procs.
-    iplanes = iplanes-1
-    rem = 0
-    nplanes         = N(4,botband) - N(4,0)
-    procs(botband)  = ceiling(nplanes*1d0/iplanes)
-    procs(topband)  = procs(botband)
-    rem             = rem + procs(botband) + procs(topband)
-    i_load(botband) = load_band(botband)/nplanes*iplanes
-    i_load(topband) = load_band(topband)/nplanes*iplanes
-    nplanes         = N(4,midband) - N(4,botband)
-    procs(midband)  = np - rem
-    i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
+  jlow = N(4,0) + 1
+  jupp = N(4,nband)
 
-  ! TODO
-  ! Once we know the number of procs per band ('procs') we asign a particular set of planes to each proc
-  !  planelim does NOT include the walls (first and last points in ugrid, vgrid).
-  !  For the pgrid it does not include the first and last points for consistency. Although they actually matter
-  !    this function is never called for pgrid.
-  !   planelim(1,:,:) = planelim(vgrid,bottom(1)/top(2),myid) v grid points
-  !   planelim(2,:,:) = planelim(ugrid,bottom(1)/top(2),myid) u/w grid points
-  !   planelim(3,:,:) = planelim(pgrid,bottom(1)/top(2),myid) p grid points
-  procs_b = procs
-  procs_c = procs
-  ! u and w grid
-  do iband = 1,nband
-    ! Compute the load per band and print it to screen
-    nplanes = N(4,iband) - N(4,iband-1)
-    iplanes = nplanes/procs_b(iband)
-    rem     = nplanes - iplanes*procs_b(iband)
-    if (rem==0) then
-      i_load(iband) = load_band(iband)/nplanes*iplanes
-    else
-      i_load(iband) = load_band(iband)/nplanes*(iplanes+1)
+  weight_tot = sum(weight)  
+  ideal_load = weight_tot / np
+
+  !write(6,*) "weight_tot",weight_tot, "ideal_load", ideal_load
+  ! write(6,*) "weight(151)",weight(151), "weight(1)", weight(1)
+
+  allocate(jmin_plane(0:np-1), jmax_plane(0:np-1))
+  allocate(proc_load(0:np-1), nplanes(0:np-1))
+
+  jmin_plane(0) = jlow
+
+  !initialising values 
+  cumulative_load = 0.0d0
+  iproc = 0
+  j = jlow
+  proc_load = 0
+  nplanes   = 0
+
+  do while (j <= jupp .and. iproc <= np-1)
+
+    cumulative_load = cumulative_load + weight(j)
+    ! write(6,*) "cumulative_load", cumulative_load, "j",j , "weight", weight(j)
+    j = j+1
+    
+    
+    if (cumulative_load >= ideal_load) then
+      !write(6,*) "enetered if statement"
+
+      cumulative_load_1 = cumulative_load - weight(j-1)
+      cumulative_load_2 = cumulative_load
+
+      if (abs(cumulative_load_1 - ideal_load )< abs(cumulative_load_2 - ideal_load)) then
+        cut_plane = j-1
+        proc_load(iproc) = cumulative_load_1
+      else
+        cut_plane = j 
+        proc_load(iproc) = cumulative_load_2
+      end if
+      
+     
+      jmax_plane(iproc) = cut_plane
+      iproc = iproc + 1
+
+      if (iproc < np-1) then
+        jmin_plane(iproc) = cut_plane + 1
+      else
+        jmin_plane(iproc) = cut_plane + 1                     ! setting last proc to be whatever is left 
+        jmax_plane(iproc) = jupp
+        proc_load(iproc)  = weight_tot - sum(proc_load(0:iproc-1))
+      end if
+
+
+      cumulative_load = 0.0d0
+      j = cut_plane + 1
     end if
-    if (myid==0) then
-      write(*,27) 'iband',iband,'planes',nplanes,'procs',procs(iband),'    proc_load',i_load(iband)
-      27 format(a5,i2,a7,i4,a6,i4,a14,f14.2)
-    end if
-    ! Assign to each procs the planes they have to handle
-    do iproc = 1,rem
-      planelim(ugrid,1,iproc-1+procs_b(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
-      planelim(ugrid,2,iproc-1+procs_b(iband-1)) = (iplanes+1)* iproc         ! To
-    end do
-    do iproc = rem+1,procs_b(iband)
-      planelim(ugrid,1,iproc-1+procs_b(iband-1)) = iplanes*(iproc-rem-1) + (iplanes+1)*rem +1
-      planelim(ugrid,2,iproc-1+procs_b(iband-1)) = iplanes*(iproc-rem  ) + (iplanes+1)*rem
-    end do
-    do iproc = 1,procs_b(iband)
-      planelim(ugrid,1,iproc-1+procs_b(iband-1)) = planelim(ugrid,1,iproc-1+procs_b(iband-1)) + N(4,iband-1)
-      planelim(ugrid,2,iproc-1+procs_b(iband-1)) = planelim(ugrid,2,iproc-1+procs_b(iband-1)) + N(4,iband-1)
-    end do   
-    procs_b(iband) = procs_b(iband-1) + procs_b(iband)
-  end do
-  ! v grid
-  do iband = 1,nband
-    nplanes = N(3,iband) - N(3,iband-1)
-    iplanes = nplanes/procs(iband)
-    rem     = nplanes - iplanes*procs(iband)
-    do iproc = 1,rem
-      planelim(vgrid,1,iproc-1+procs(iband-1)) = (iplanes+1)*(iproc-1) +1    ! From
-      planelim(vgrid,2,iproc-1+procs(iband-1)) = (iplanes+1)* iproc          ! To
-    end do
-    do iproc = rem+1,procs(iband)
-      planelim(vgrid,1,iproc-1+procs(iband-1)) = iplanes*(iproc-1-rem) + (iplanes+1)*rem +1
-      planelim(vgrid,2,iproc-1+procs(iband-1)) = iplanes*(iproc  -rem) + (iplanes+1)*rem 
-    end do
-    do iproc = 1,procs(iband)
-      planelim(vgrid,1,iproc-1+procs(iband-1)) = planelim(vgrid,1,iproc-1+procs(iband-1)) + N(3,iband-1)
-      planelim(vgrid,2,iproc-1+procs(iband-1)) = planelim(vgrid,2,iproc-1+procs(iband-1)) + N(3,iband-1)
-    end do   
-    procs(iband) = procs(iband-1) + procs(iband)
-  end do
-  ! p grid
-  do iband = botband,botband
-    nplanes = N(4,iband) - N(4,iband-1) - 2 ! No ghost points
-    iplanes = nplanes/procs_c(iband)
-    rem     = nplanes - iplanes*procs_c(iband)
-    do iproc = 1,rem
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc         ! To
-    end do
-    do iproc = rem+1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1) + (iplanes+1)*rem +1
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  ) + (iplanes+1)*rem
-    end do
-    do iproc = 1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1 !E!first point shifted
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1 !E!first point shifted
-    end do   
-    procs_c(iband) = procs_c(iband-1) + procs_c(iband)
-  end do
-  do iband = midband,midband
-    nplanes = N(4,iband) - N(4,iband-1) + 2
-    iplanes = nplanes/procs_c(iband)
-    rem     = nplanes - iplanes*procs_c(iband)
-    do iproc = 1,rem
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1-1   ! From
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc      -1   ! To
-    end do
-    do iproc = rem+1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1)+(iplanes+1)*rem +1 -1
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  )+(iplanes+1)*rem    -1
-    end do
-    do iproc = 1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1)
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1)
-    end do   
-    procs_c(iband)=procs_c(iband-1)+procs_c(iband)
-  end do
-  do iband = topband,topband
-    nplanes = N(4,iband) - N(4,iband-1) - 2 ! No ghost point2
-    iplanes = nplanes/procs_c(iband)
-    rem     = nplanes - iplanes*procs_c(iband)
-    do iproc = 1,rem
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc         ! To
-    end do
-    do iproc = rem+1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1)+(iplanes+1)*rem +1
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  )+(iplanes+1)*rem
-    end do
-    do iproc = 1,procs_c(iband)
-      planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1
-      planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1
-    end do   
-    procs_c(iband) = procs_c(iband-1) + procs_c(iband)
+
   end do
 
-  ! TODO
+  ! do iproc = 0,np-1
+  !   write(6,*) "iproc=", iproc,  jmin_plane(iproc), jmax_plane(iproc)
+  ! end do
+
+  do iproc = 0, np-1
+
+    ! default: all grids use full j-range for this proc
+    planelim(ugrid,1,iproc) = jmin_plane(iproc)
+    planelim(ugrid,2,iproc) = jmax_plane(iproc)
+
+    planelim(vgrid,1,iproc) = jmin_plane(iproc)
+    planelim(vgrid,2,iproc) = jmax_plane(iproc)
+
+    planelim(pgrid,1,iproc) = jmin_plane(iproc)
+    planelim(pgrid,2,iproc) = jmax_plane(iproc)
+
+    ! special case: first proc (shift p-grid start)
+    if (iproc == 0) then
+      planelim(pgrid,1,iproc) = jmin_plane(iproc) + 1
+
+    ! special case: last proc (shrink v and p by 1 at top)
+    else if (iproc == np-1) then
+      planelim(vgrid,2,iproc) = jmax_plane(iproc) - 1
+      planelim(pgrid,2,iproc) = jmax_plane(iproc) - 1
+    end if
+
+    nplanes(iproc) = planelim(ugrid,2,iproc) - planelim(ugrid,1,iproc)
+    ! write(6,*) "nplanes",  nplanes(iproc)
+
+    bandPL(iproc) = nband ! keeping this for now bc otherwise code will break but setting at a const
+
+  end do
+
+
+  ! limPL_incw: like old code – same as planelim but extend first/last proc by 1 plane
   ! limPL_incw is like planelim but including first and last points that were previously removed.
   !  It is only used in planes_to_modes_UVP, modes_to_planes_UVP, record_out and stats
-  limPL_incw = planelim
-  limPL_incw(:,1,0   ) = planelim(:,1,0   ) -1
-  limPL_incw(:,2,np-1) = planelim(:,2,np-1) +1
-
-  ! TODO
-  ! limPL_excw is like planelim (i.e. EXCluding Walls) but the pgrid includes all points (there is no reason to take them out in first place)
-  ! This function is used in ops_in_planes, a few functions when computing the advective term
   limPL_excw = planelim
-  !limPL_excw(pgrid,1,0   ) = planelim(pgrid,1,0   ) -1
-  !limPL_excw(pgrid,2,np-1) = planelim(pgrid,2,np-1) +1
+  limPL_incw(:,1,0   ) = planelim(:,1,0   ) - 1
+  limPL_incw(:,2,np-1) = planelim(:,2,np-1) + 1
 
-  if (myid==0) then
-    write(*,*) ''
-  end if
+  
 
-  ! bandPL(iproc) returns the band the proc works on.
-  ! In the physical space, procs only act on a single band
-  do iproc = 0,np-1
-    do iband = nband,1,-1
-      if (iproc<procs(iband)) then
-        bandPL(iproc) = iband
-      end if
-    end do
-  end do
+  ! do i=0, np-1
+  !   write(6,*) "u", limPL_excw(ugrid,1,i), limPL_excw(ugrid,2,i), &
+  !         "v", limPL_excw(vgrid,1,i), limPL_excw(vgrid,2,i), &
+  !         "p", limPL_excw(pgrid,1,i), limPL_excw(pgrid,2,i)
 
-  ! Limits of the 'planes' in x and z: A certain thickness in y, and the whole box in x and z
-  do iband = nband,1,-1
-    if (myid<procs(iband)) then
-      igal = Ngal(1,iband)+2
-      kgal = Ngal(2,iband)
-    end if
-  end do
+  ! end do
+
+
+    ! Limits of the 'planes' in x and z: A certain thickness in y, and the whole box in x and z
+
+
+  igal = Ngal(1,nband)+2
+  kgal = Ngal(2,nband)
+
 
   jgal(ugrid,1) = limPL_excw(ugrid,1,myid)
   jgal(ugrid,2) = limPL_excw(ugrid,2,myid)
@@ -3118,55 +3128,375 @@ subroutine proc_lims_planes(myid)
   jgal(vgrid,2) = limPL_excw(vgrid,2,myid)
   jgal(pgrid,1) = limPL_excw(pgrid,1,myid)
   jgal(pgrid,2) = limPL_excw(pgrid,2,myid)
+
+  if (myid == 0) then
+    do iproc = 0, np-1
+      write(6,*) "iproc", iproc, &
+                "nplanes", nplanes(iproc), &
+                "proc_load", proc_load(iproc)
+    end do
+  end if
+
   
 
+  
   !For FFT planes
 
+
+  !!! COPIED FROM OLD CODE - IDK WHY WE HAVE THIS OR WHAT IT IS 
   !Bottom band
-  proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid)+1)/(np/2))
-  rem_planes = (physlim_bot-jlim(1,ugrid)+1)-(np/2)*proc_planes
-  iplanes = jlim(1,ugrid)-1
+  ! proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid,2)+1)/(np/2))
+  ! rem_planes = (physlim_bot-jlim(1,ugrid,2)+1)-(np/2)*proc_planes
+  ! iplanes = jlim(1,ugrid,2)-1
 
-    do iproc = 0,np/2-1
-      limPL_FFT(:,1,iproc) = iplanes + 1
+  !   do iproc = 0,np/2-1
+  !     limPL_FFT(:,1,iproc) = iplanes + 1
       
-      if(iproc<rem_planes)then
-        iplanes = iplanes + proc_planes + 1
-      else
-        iplanes = iplanes + proc_planes
-      endif
-      limPL_FFT(:,2,iproc) = iplanes
-      bandPL_FFT(iproc)=1
+  !     if(iproc<rem_planes)then
+  !       iplanes = iplanes + proc_planes + 1
+  !     else
+  !       iplanes = iplanes + proc_planes
+  !     endif
+  !     limPL_FFT(:,2,iproc) = iplanes
+  !     bandPL_FFT(iproc)=1
 
-    enddo
+  !   enddo
 
-  !Top band
-  proc_planes = floor(1d0*(jlim(2,ugrid)-physlim_top+1)/(np/2))
-  rem_planes = (jlim(2,ugrid)-physlim_top+1)-(np/2)*proc_planes
-  iplanes = physlim_top-1
+  ! !Top band
+  ! proc_planes = floor(1d0*(jlim(2,ugrid,2)-physlim_top+1)/(np/2))
+  ! rem_planes = (jlim(2,ugrid,2)-physlim_top+1)-(np/2)*proc_planes
+  ! iplanes = physlim_top-1
 
-    do iproc = np/2,np-1
-      limPL_FFT(:,1,iproc) = iplanes + 1
+  !   do iproc = np/2,np-1
+  !     limPL_FFT(:,1,iproc) = iplanes + 1
       
-      if(iproc-np/2<rem_planes)then
-        iplanes = iplanes + proc_planes + 1
-      else
-        iplanes = iplanes + proc_planes
-      endif
-      limPL_FFT(:,2,iproc) = iplanes
-      bandPL_FFT(iproc)=3
-    enddo
+  !     if(iproc-np/2<rem_planes)then
+  !       iplanes = iplanes + proc_planes + 1
+  !     else
+  !       iplanes = iplanes + proc_planes
+  !     endif
+  !     limPL_FFT(:,2,iproc) = iplanes
+  !     bandPL_FFT(iproc)=3
+  !   enddo
     
-    limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
+  !   limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
 
 
-  deallocate(load_band,i_load)
+
 
 end subroutine
 
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!    PROC LIMS planes old   !!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! subroutine proc_lims_planes(myid)
+!   ! Calculates the different variables that define planes (phys) for every proc 
+!   ! Defines i-k-,j-gal, planelim and bandPL
+!   ! First computes roughly the proportional load that each proc should handle.
+!   !  Then it tries to share all the planes, allocating more procs for the finer planes.
+!   !  Once balanced, it establishes the limit planes (planelim) for the procs.
+
+!   use declaration
+!   implicit none
+
+!   integer :: myid
+!   integer :: nplanes, iplanes
+!   integer :: iband, iproc, rem
+!   real(8) :: loadT, loadP, maxload
+!   real(8), allocatable:: load_band(:),i_load(:)
+  
+!   integer :: proc_planes
+!   integer :: rem_planes
+
+!   allocate(load_band(nband),i_load(nband))
+!   allocate(procs  (0:nband))
+!   allocate(procs_b(0:nband))
+!   allocate(procs_c(0:nband))
+!   allocate(planelim  (3,2,0:np-1))
+!   allocate(limPL_incw(3,2,0:np-1))
+!   allocate(limPL_excw(3,2,0:np-1))
+!   allocate(limPL_FFT(3,2,0:np-1))
+!   allocate(bandPL(0:np-1))
+!   allocate(bandPL_FFT(0:np-1))
+  
+!   limPL_FFT = 9999
+
+!   ! Computing mean load per proc
+!   loadT = 0d0
+!   do iband = 1,nband
+!     ! Roughly the load of a band is equal to the number of points
+!     load_band(iband) = (Ngal(1,iband)+2)*Ngal(2,iband)*(Ngal(4,iband)-N(4,iband-1)) ! Number of points (nx+2)*nz*ny(band)
+!     loadT            = loadT + load_band(iband)
+!   end do
+!   loadP = loadT/np ! Load per proc
+!   ! Assigns one proc per plane to the fine-grid bands
+!   ! Ussually we'll run out of procs. This will be corrected in a following step
+!   procs(0) = 0  ! Procs per band
+!   rem      = 0
+!   nplanes         = N(4,botband) - N(4,0)                     ! Nb of planes in a band (phys)
+!   procs(botband)  = nplanes                                   ! One proc per plane (too greedy)
+!   procs(topband)  = nplanes                                   !
+!   rem             = rem + procs(botband) + procs(topband)
+!   i_load(botband) = load_band(botband)/nplanes                ! Computational load per plane
+!   i_load(topband) = load_band(topband)/nplanes                ! Computational load per plane
+!   ! Assigns the remaining procs to the central band (which are coarser and thus less computing demanding)
+!   nplanes         = N(4,midband) - N(4,botband)
+!   procs(midband)  = np - rem
+!   iplanes         = ceiling(nplanes*1d0/procs(midband))
+!   i_load(midband) = load_band(midband)/nplanes*iplanes
+!   ! Balance the load of procs.
+!     ! Iterates till the central band has a positive number of procs
+!     iplanes = 1
+!     do while (procs(midband)<=0)
+!       iplanes = iplanes + 1
+!       rem = 0
+!       nplanes = N(4,botband) - N(4,0)
+!       procs(botband)  = ceiling(nplanes*1d0/iplanes)
+!       procs(topband)  = procs(botband)
+!       rem             = rem + procs(botband) + procs(topband)
+!       i_load(botband) = load_band(botband)/nplanes*iplanes
+!       i_load(topband) = load_band(topband)/nplanes*iplanes
+!       nplanes         = N(4,midband) - N(4,botband)
+!       procs(midband)  = np - rem
+!       i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
+!     end do
+!     ! Few fine grid planes per proc, and more coarse grid planes such that the computing time is more or less the same
+!     maxload = 2d0*maxval(i_load)
+!     do while (maxval(i_load)<maxload)
+!       iplanes = iplanes+1
+!       maxload = maxval(i_load)
+!       rem = 0
+!       nplanes         = N(4,botband)-N(4,0)
+!       procs(botband)  = ceiling(nplanes*1d0/iplanes)
+!       procs(topband)  = procs(botband)
+!       rem             = rem + procs(botband) + procs(topband)
+!       i_load(botband) = load_band(botband)/nplanes*iplanes
+!       i_load(topband) = load_band(topband)/nplanes*iplanes
+!       nplanes         = N(4,midband) - N(4,botband)
+!       procs(midband)  = np - rem
+!       i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
+!     end do
+!     ! Once the load has been balanced, we go one step backwards to reduce a bit the load of the 'fine' procs.
+!     iplanes = iplanes-1
+!     rem = 0
+!     nplanes         = N(4,botband) - N(4,0)
+!     procs(botband)  = ceiling(nplanes*1d0/iplanes)
+!     procs(topband)  = procs(botband)
+!     rem             = rem + procs(botband) + procs(topband)
+!     i_load(botband) = load_band(botband)/nplanes*iplanes
+!     i_load(topband) = load_band(topband)/nplanes*iplanes
+!     nplanes         = N(4,midband) - N(4,botband)
+!     procs(midband)  = np - rem
+!     i_load(midband) = load_band(midband)/nplanes*ceiling(nplanes*1d0/procs(midband))
+
+!   ! TODO
+!   ! Once we know the number of procs per band ('procs') we asign a particular set of planes to each proc
+!   !  planelim does NOT include the walls (first and last points in ugrid, vgrid).
+!   !  For the pgrid it does not include the first and last points for consistency. Although they actually matter
+!   !    this function is never called for pgrid.
+!   !   planelim(1,:,:) = planelim(vgrid,bottom(1)/top(2),myid) v grid points
+!   !   planelim(2,:,:) = planelim(ugrid,bottom(1)/top(2),myid) u/w grid points
+!   !   planelim(3,:,:) = planelim(pgrid,bottom(1)/top(2),myid) p grid points
+!   procs_b = procs
+!   procs_c = procs
+!   ! u and w grid
+!   do iband = 1,nband
+!     ! Compute the load per band and print it to screen
+!     nplanes = N(4,iband) - N(4,iband-1)
+!     iplanes = nplanes/procs_b(iband)
+!     rem     = nplanes - iplanes*procs_b(iband)
+!     if (rem==0) then
+!       i_load(iband) = load_band(iband)/nplanes*iplanes
+!     else
+!       i_load(iband) = load_band(iband)/nplanes*(iplanes+1)
+!     end if
+!     if (myid==0) then
+!       write(*,27) 'iband',iband,'planes',nplanes,'procs',procs(iband),'    proc_load',i_load(iband)
+!       27 format(a5,i2,a7,i4,a6,i4,a14,f14.2)
+!     end if
+!     ! Assign to each procs the planes they have to handle
+!     do iproc = 1,rem
+!       planelim(ugrid,1,iproc-1+procs_b(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
+!       planelim(ugrid,2,iproc-1+procs_b(iband-1)) = (iplanes+1)* iproc         ! To
+!     end do
+!     do iproc = rem+1,procs_b(iband)
+!       planelim(ugrid,1,iproc-1+procs_b(iband-1)) = iplanes*(iproc-rem-1) + (iplanes+1)*rem +1
+!       planelim(ugrid,2,iproc-1+procs_b(iband-1)) = iplanes*(iproc-rem  ) + (iplanes+1)*rem
+!     end do
+!     do iproc = 1,procs_b(iband)
+!       planelim(ugrid,1,iproc-1+procs_b(iband-1)) = planelim(ugrid,1,iproc-1+procs_b(iband-1)) + N(4,iband-1)
+!       planelim(ugrid,2,iproc-1+procs_b(iband-1)) = planelim(ugrid,2,iproc-1+procs_b(iband-1)) + N(4,iband-1)
+!     end do   
+!     procs_b(iband) = procs_b(iband-1) + procs_b(iband)
+!   end do
+!   ! v grid
+!   do iband = 1,nband
+!     nplanes = N(3,iband) - N(3,iband-1)
+!     iplanes = nplanes/procs(iband)
+!     rem     = nplanes - iplanes*procs(iband)
+!     do iproc = 1,rem
+!       planelim(vgrid,1,iproc-1+procs(iband-1)) = (iplanes+1)*(iproc-1) +1    ! From
+!       planelim(vgrid,2,iproc-1+procs(iband-1)) = (iplanes+1)* iproc          ! To
+!     end do
+!     do iproc = rem+1,procs(iband)
+!       planelim(vgrid,1,iproc-1+procs(iband-1)) = iplanes*(iproc-1-rem) + (iplanes+1)*rem +1
+!       planelim(vgrid,2,iproc-1+procs(iband-1)) = iplanes*(iproc  -rem) + (iplanes+1)*rem 
+!     end do
+!     do iproc = 1,procs(iband)
+!       planelim(vgrid,1,iproc-1+procs(iband-1)) = planelim(vgrid,1,iproc-1+procs(iband-1)) + N(3,iband-1)
+!       planelim(vgrid,2,iproc-1+procs(iband-1)) = planelim(vgrid,2,iproc-1+procs(iband-1)) + N(3,iband-1)
+!     end do   
+!     procs(iband) = procs(iband-1) + procs(iband)
+!   end do
+!   ! p grid
+!   do iband = botband,botband
+!     nplanes = N(4,iband) - N(4,iband-1) - 2 ! No ghost points
+!     iplanes = nplanes/procs_c(iband)
+!     rem     = nplanes - iplanes*procs_c(iband)
+!     do iproc = 1,rem
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc         ! To
+!     end do
+!     do iproc = rem+1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1) + (iplanes+1)*rem +1
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  ) + (iplanes+1)*rem
+!     end do
+!     do iproc = 1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1 !E!first point shifted
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1 !E!first point shifted
+!     end do   
+!     procs_c(iband) = procs_c(iband-1) + procs_c(iband)
+!   end do
+!   do iband = midband,midband
+!     nplanes = N(4,iband) - N(4,iband-1) + 2
+!     iplanes = nplanes/procs_c(iband)
+!     rem     = nplanes - iplanes*procs_c(iband)
+!     do iproc = 1,rem
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1-1   ! From
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc      -1   ! To
+!     end do
+!     do iproc = rem+1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1)+(iplanes+1)*rem +1 -1
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  )+(iplanes+1)*rem    -1
+!     end do
+!     do iproc = 1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1)
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1)
+!     end do   
+!     procs_c(iband)=procs_c(iband-1)+procs_c(iband)
+!   end do
+!   do iband = topband,topband
+!     nplanes = N(4,iband) - N(4,iband-1) - 2 ! No ghost point2
+!     iplanes = nplanes/procs_c(iband)
+!     rem     = nplanes - iplanes*procs_c(iband)
+!     do iproc = 1,rem
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = (iplanes+1)*(iproc-1) +1   ! From
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = (iplanes+1)* iproc         ! To
+!     end do
+!     do iproc = rem+1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem-1)+(iplanes+1)*rem +1
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = iplanes*(iproc-rem  )+(iplanes+1)*rem
+!     end do
+!     do iproc = 1,procs_c(iband)
+!       planelim(pgrid,1,iproc-1+procs_c(iband-1)) = planelim(pgrid,1,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1
+!       planelim(pgrid,2,iproc-1+procs_c(iband-1)) = planelim(pgrid,2,iproc-1+procs_c(iband-1)) + N(4,iband-1) +1
+!     end do   
+!     procs_c(iband) = procs_c(iband-1) + procs_c(iband)
+!   end do
+
+!   ! TODO
+!   ! limPL_incw is like planelim but including first and last points that were previously removed.
+!   !  It is only used in planes_to_modes_UVP, modes_to_planes_UVP, record_out and stats
+!   limPL_incw = planelim
+!   limPL_incw(:,1,0   ) = planelim(:,1,0   ) -1
+!   limPL_incw(:,2,np-1) = planelim(:,2,np-1) +1
+
+!   ! TODO
+!   ! limPL_excw is like planelim (i.e. EXCluding Walls) but the pgrid includes all points (there is no reason to take them out in first place)
+!   ! This function is used in ops_in_planes, a few functions when computing the advective term
+!   limPL_excw = planelim
+!   !limPL_excw(pgrid,1,0   ) = planelim(pgrid,1,0   ) -1
+!   !limPL_excw(pgrid,2,np-1) = planelim(pgrid,2,np-1) +1
+
+!   if (myid==0) then
+!     write(*,*) ''
+!   end if
+
+!   ! bandPL(iproc) returns the band the proc works on.
+!   ! In the physical space, procs only act on a single band
+!   do iproc = 0,np-1
+!     do iband = nband,1,-1
+!       if (iproc<procs(iband)) then
+!         bandPL(iproc) = iband
+!       end if
+!     end do
+!   end do
+
+!   ! Limits of the 'planes' in x and z: A certain thickness in y, and the whole box in x and z
+!   do iband = nband,1,-1
+!     if (myid<procs(iband)) then
+!       igal = Ngal(1,iband)+2
+!       kgal = Ngal(2,iband)
+!     end if
+!   end do
+
+!   jgal(ugrid,1) = limPL_excw(ugrid,1,myid)
+!   jgal(ugrid,2) = limPL_excw(ugrid,2,myid)
+!   jgal(vgrid,1) = limPL_excw(vgrid,1,myid)
+!   jgal(vgrid,2) = limPL_excw(vgrid,2,myid)
+!   jgal(pgrid,1) = limPL_excw(pgrid,1,myid)
+!   jgal(pgrid,2) = limPL_excw(pgrid,2,myid)
+  
+
+!   !For FFT planes
+
+!   !Bottom band
+!   proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid)+1)/(np/2))
+!   rem_planes = (physlim_bot-jlim(1,ugrid)+1)-(np/2)*proc_planes
+!   iplanes = jlim(1,ugrid)-1
+
+!     do iproc = 0,np/2-1
+!       limPL_FFT(:,1,iproc) = iplanes + 1
+      
+!       if(iproc<rem_planes)then
+!         iplanes = iplanes + proc_planes + 1
+!       else
+!         iplanes = iplanes + proc_planes
+!       endif
+!       limPL_FFT(:,2,iproc) = iplanes
+!       bandPL_FFT(iproc)=1
+
+!     enddo
+
+!   !Top band
+!   proc_planes = floor(1d0*(jlim(2,ugrid)-physlim_top+1)/(np/2))
+!   rem_planes = (jlim(2,ugrid)-physlim_top+1)-(np/2)*proc_planes
+!   iplanes = physlim_top-1
+
+!     do iproc = np/2,np-1
+!       limPL_FFT(:,1,iproc) = iplanes + 1
+      
+!       if(iproc-np/2<rem_planes)then
+!         iplanes = iplanes + proc_planes + 1
+!       else
+!         iplanes = iplanes + proc_planes
+!       endif
+!       limPL_FFT(:,2,iproc) = iplanes
+!       bandPL_FFT(iproc)=3
+!     enddo
+    
+!     limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
+
+
+!   deallocate(load_band,i_load)
+
+! end subroutine
+
 subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!     GETINI     !!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!     GETINI  NEW   !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! Grab the initial condition and initialize some variables
@@ -3177,9 +3507,9 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
   include 'mpif.h'                                  ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid         ! MPI variables
   integer iband
-  type(cfield)  u1(sband:eband),u2(sband:eband),u3(sband:eband)
-  type(cfield)  p (sband:eband)
-  type(cfield) div(sband:eband)
+  type(cfield)  u1,u2,u3
+  type(cfield)  p 
+  type(cfield)  div
 
   if (myid==0) then
     write(*,*) 'Launching...'
@@ -3192,7 +3522,8 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     end if
     call mblock_ini(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
     if (myid==0) then
-      call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+      call flowrateIm(Qx,u1%f(N(4,0),1))        !check why flowrate used midband ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+      !write(6,*) "flowrateIm", Qx
       if (flag_ctpress/=1) then
         QxT = Qx
       end if
@@ -3207,7 +3538,7 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     end if
     call mblock_ini(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
     if (myid==0) then
-      call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+      call flowrateIm(Qx,u1%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
       ! TODO change this condition for 'flag_ctpress == 0'
       if (flag_ctpress/=1) then  ! Constant flow rate (flag_ctpress == 1, constant pressure gradient)
         QxT = Qx
@@ -3220,7 +3551,7 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     end if
     call mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
     if (myid==0) then
-      call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+      call flowrateIm(Qx,u1%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
       ! TODO change this condition for 'flag_ctpress == 0'
       if (flag_ctpress/=1) then  ! Constant flow rate (flag_ctpress == 1, constant pressure gradient)
         QxT = Qx
@@ -3235,6 +3566,8 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     stop
   end if
 
+  write(6,*) "finished init conds"
+
   ! Broadcast the time step and time.
   ! If it's initialized from a previous simulation this value is already known, otherwise it's set to 0
   call MPI_BCAST(iter0,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
@@ -3244,12 +3577,13 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
   iwrite = iter
 
   ! 'Probably' this is used to initialize the divergence in the case of a new simulation
-  do iband = sband,eband
-    call divergence(div(iband)%f,u1(iband)%f,u2(iband)%f,u3(iband)%f,iband,myid)
-  end do
+  ! write(6,*) "call divergence "
+  call divergence(div%f,u1%f,u2%f,u3%f,iband,myid)
 
+  ! write(6,*) "call init stats"
   call init_stats(myid)
   
+  ! write(6,*) "call init_sl stats"
   call init_sl_stats(myid)
 
   if (myid==0) then
@@ -3274,6 +3608,118 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
 
 end subroutine
 
+
+! subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!     GETINI OLD    !!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ! Grab the initial condition and initialize some variables
+
+!   use declaration
+!   implicit none
+
+!   include 'mpif.h'                                  ! MPI variables
+!   integer status(MPI_STATUS_SIZE),ierr,myid         ! MPI variables
+!   integer iband
+!   type(cfield)  u1(sband:eband),u2(sband:eband),u3(sband:eband)
+!   type(cfield)  p (sband:eband)
+!   type(cfield)  div(sband:eband)
+
+!   if (myid==0) then
+!     write(*,*) 'Launching...'
+!   end if
+
+!   if (flag_init==1) then       ! Initial conditions borrowed from another 
+!     if (myid==0) then
+!       write(*,*) 'starting from multi-block, flat channel?'
+!       write(*,*) 'start file: ',trim(dirin)//trim(fnameimb)
+!     end if
+!     call mblock_ini(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
+!     if (myid==0) then
+!       call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+!       if (flag_ctpress/=1) then
+!         QxT = Qx
+!       end if
+!     end if
+!     iter0 = 0
+!     mpgz  = 0d0
+!     t     = 0d0
+!   else if (flag_init==2) then  ! Continuing simulation
+!     if (myid==0) then
+!       write(*,*) 'continuing simulation'
+!       write(*,*) 'start file:',fnameimb
+!     end if
+!     call mblock_ini(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
+!     if (myid==0) then
+!       call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+!       ! TODO change this condition for 'flag_ctpress == 0'
+!       if (flag_ctpress/=1) then  ! Constant flow rate (flag_ctpress == 1, constant pressure gradient)
+!         QxT = Qx
+!       end if
+!     end if
+!     mpgz = 0d0
+!   else if (flag_init==3) then  ! Parabolic profile
+!     if (myid==0) then
+!       write(*,*) 'parabolic profile'
+!     end if
+!     call mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)         ! Initializes u1, u2, u3, p, u1PL, u2PL, u3PL, ppPL
+!     if (myid==0) then
+!       call flowrateIm(Qx,u1(midband)%f(N(4,0),1))        ! Column 1 of proc 0 is mode (0,1) [the meeeean]
+!       ! TODO change this condition for 'flag_ctpress == 0'
+!       if (flag_ctpress/=1) then  ! Constant flow rate (flag_ctpress == 1, constant pressure gradient)
+!         QxT = Qx
+!       end if
+!     end if
+!     iter0 = 0
+!     mpgz  = 0d0
+!     t     = 0d0
+!   else 
+!     write(*,*) 'INITIAL CONDITIONS NOT IMPLEMENTED YET'
+!     call MPI_FINALIZE(ierr)
+!     stop
+!   end if
+
+!   ! Broadcast the time step and time.
+!   ! If it's initialized from a previous simulation this value is already known, otherwise it's set to 0
+!   call MPI_BCAST(iter0,1,MPI_INTEGER,0,MPI_COMM_WORLD,ierr)
+!   call MPI_BCAST(t    ,1,MPI_REAL8  ,0,MPI_COMM_WORLD,ierr)
+!   iter   = iter0
+!   !  iter0=iter-nstat
+!   iwrite = iter
+
+!   ! 'Probably' this is used to initialize the divergence in the case of a new simulation
+!   do iband = sband,eband
+!     call divergence(div(iband)%f,u1(iband)%f,u2(iband)%f,u3(iband)%f,iband,myid)
+!   end do
+
+!   call init_stats(myid)
+  
+!   call init_sl_stats(myid)
+
+!   if (myid==0) then
+!     write(*,*) 'Lx    ',Lx
+!     write(*,*) 'Ly    ',Ly
+!     write(*,*) 'Lz    ',Lz
+!     write(*,*) 'Nx    ',N(1,1:nband)
+!     write(*,*) 'Nz    ',N(2,1:nband)
+!     write(*,*) 'Nyv   ',N(3,0:nband)
+!     write(*,*) 'Nyu   ',N(4,0:nband)
+!     write(*,*) 'Ngalx ',Ngal(1,1:nband)
+!     write(*,*) 'Ngalz ',Ngal(2,1:nband)
+!     write(*,*) 'Ngaly ',Ngal(3,1:nband)-Ngal(3,0:nband-1)
+!     write(*,*) 'Ngalyu',Ngal(4,1:nband)-Ngal(4,0:nband-1)
+!     write(*,*) ''
+!     write(*,*) 'dymin ',yu(1)-yu(0)
+!     write(*,*) 'dymax ',yu((N(4,nband)+1)/2+1)-yu((N(4,nband)+1)/2)
+!     write(*,*) ''
+!     write(*,*) 'Re ',Re
+!     write(*,*) 't  ',t
+!   end if
+
+! end subroutine
+
+
 subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!   MBLOCK INI   !!!!!!!!!!!!!!!!!!!!!!!
@@ -3287,26 +3733,27 @@ subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
 
   integer iband,j,i,k,column
   real(8) sigmaz,z,sigmax,x,fact
-  type(cfield) u1(sband:eband),u2(sband:eband),u3(sband:eband),p(sband:eband)
+  type(cfield) u1,u2,u3,p
 
   u1PL = 0d0
   u2PL = 0d0
   u3PL = 0d0
   ppPL = 0d0
-  do iband = sband,eband
-    u1(iband)%f = 0d0
-    u2(iband)%f = 0d0
-    u3(iband)%f = 0d0
-    p (iband)%f = 0d0
-  end do
+
+  u1%f = 0d0
+  u2%f = 0d0
+  u3%f = 0d0
+  p%f = 0d0
+
 
   call read_in(myid)
    
-  
+  write(6,*) " start pplanes to modes"
   call planes_to_modes_UVP(u1,u1PL,2,myid,status,ierr)
   call planes_to_modes_UVP(u2,u2PL,1,myid,status,ierr)
   call planes_to_modes_UVP(u3,u3PL,2,myid,status,ierr)
   call planes_to_modes_UVP(p ,ppPL,3,myid,status,ierr)
+  write(6,*) " finished pplanes to modes"
   
   ! Chris' trick
   !Pressure reset
@@ -3466,7 +3913,7 @@ end subroutine
 
 subroutine read_in(myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!    READ IN     !!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!    READ IN  NEW   !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! Reads the file with the inital condition
@@ -3481,7 +3928,7 @@ subroutine read_in(myid)
   include 'mpif.h'             ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid
   integer nx,nz,nxin,nzin,nband2,iband
-  integer j,jin,iproc,dummI,ju1,ju2,jv1,jv2,jp1,jp2
+  integer j,jin,iproc,dummI,ju1,ju2,jv1,jv2,jp1,jp2, i 
   real(8) dummRe,Re2,alp2,bet2
   real(8), allocatable:: buffSR(:,:),dumm_y(:)
   integer, allocatable:: dummint(:),N2(:,:)
@@ -3519,21 +3966,27 @@ subroutine read_in(myid)
     read(10) N2
     close(10)
 
+
+    if(myid ==0) then 
+      write(6,*) "N2"
+      do i= 1,4
+        write(6,*) N2(i, 0:4)
+      end do 
+    end if 
+
     dummI=0
-    do iband=1,nband
-      if (N(1,iband)/=N2(1,iband)) then
-        dummI=2
-      else if (N(2,iband)/=N2(2,iband)) then
-        dummI=2
-      else if (N(3,iband)/=N2(3,iband)) then
-        dummI=2
-      end if
-    end do
+
+    if (N(1,nband)/=N2(1,nband)) then
+      dummI=2
+    end if
+
+
     if (N(3,0)/=N2(3,0)) then
       dummI=2
     else if (N(3,nband)/=N2(3,nband)) then
       dummI=2
     end if
+
     if (dummI==1) then
       write(*,*) ''
       write(*,*) 'wrong startfile?',dummI
@@ -3897,8 +4350,449 @@ subroutine read_in(myid)
     deallocate(nxxu,nzzu,nxxv,nzzv)
     deallocate(N2)
   end if
+  !write(*,*) 'finished read in'
 
 end subroutine
+
+
+! subroutine read_in(myid)
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!    READ IN   OLD  !!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ! Reads the file with the inital condition
+
+! ! The variables u1PL, u2PL, u3PL and ppPL are sent to every proc
+! ! The procs only stores the planes they have to compute
+! !  (jgal is the local name of planelim for j)
+
+!   use declaration
+!   implicit none
+
+!   include 'mpif.h'             ! MPI variables
+!   integer status(MPI_STATUS_SIZE),ierr,myid
+!   integer nx,nz,nxin,nzin,nband2,iband
+!   integer j,jin,iproc,dummI,ju1,ju2,jv1,jv2,jp1,jp2
+!   real(8) dummRe,Re2,alp2,bet2
+!   real(8), allocatable:: buffSR(:,:),dumm_y(:)
+!   integer, allocatable:: dummint(:),N2(:,:)
+!   integer, allocatable:: nxxu(:),nzzu(:),nxxv(:),nzzv(:),nxxp(:),nzzp(:)
+
+!   filout   = fnameimb(3:index(fnameimb,' ')-1)
+
+!   if (myid==0) then
+!     ! Read the file with the initial conditions
+!     fnameimb = trim(dirin)//'/u1'//filout
+!     open(10,file=fnameimb,form='unformatted')
+!     allocate(dummint(88))
+!     read(10) t,Re2,alp2,bet2,dummRe,nband2,iter0,dummint
+! !    if (flag_ctpress==1) then
+! !      mpgx=dummRe
+! !    end if
+!     deallocate(dummint)
+
+!     ! Checks that the size of the variables in the file matches with the setup of actual problem
+!     ! Checks nband, alp, bet, N
+!     if (nband2/=nband) then
+!       write(*,*) ''
+!       write(*,*) 'wrong startfile?'
+!       write(*,*) 'nband,nband_old=',nband,nband2
+!       stop
+!     else if (alp2/=alp .or. bet2/=bet) then
+!       write(*,*) ''
+!       write(*,*) 'wrong startfile?'
+!       write(*,*) 'alp,alp_old=',alp,alp2
+!       write(*,*) 'bet,bet_old=',bet,bet2
+!       write(*,*) ''
+!     end if
+!     write(*,*) 'Re_old,Re',Re2,Re
+!     allocate(N2(4,0:nband2+1))
+!     read(10) N2
+!     close(10)
+
+!     dummI=0
+!     do iband=1,nband
+!       if (N(1,iband)/=N2(1,iband)) then
+!         dummI=2
+!       else if (N(2,iband)/=N2(2,iband)) then
+!         dummI=2
+!       else if (N(3,iband)/=N2(3,iband)) then
+!         dummI=2
+!       end if
+!     end do
+!     if (N(3,0)/=N2(3,0)) then
+!       dummI=2
+!     else if (N(3,nband)/=N2(3,nband)) then
+!       dummI=2
+!     end if
+!     if (dummI==1) then
+!       write(*,*) ''
+!       write(*,*) 'wrong startfile?',dummI
+!       write(*,*) 'N_new='
+!       write(*,*) N(1,0:nband+1)
+!       write(*,*) N(2,0:nband+1)
+!       write(*,*) N(3,0:nband+1)
+!       write(*,*) N(4,0:nband+1)
+!       write(*,*) ''
+!       write(*,*) 'N_old='
+!       write(*,*) N2(1,0:nband+1)
+!       write(*,*) N2(2,0:nband+1)
+!       write(*,*) N2(3,0:nband+1)
+!       write(*,*) N2(4,0:nband+1)
+!       stop
+!     else if (dummI==2) then
+!       write(*,*) ''
+!       write(*,*) 'WARNING startfile size',dummI
+!       write(*,*) 'N_new='
+!       write(*,*) N(1,0:nband+1)
+!       write(*,*) N(2,0:nband+1)
+!       write(*,*) N(3,0:nband+1)
+!       write(*,*) N(4,0:nband+1)
+!       write(*,*) ''
+!       write(*,*) 'N_old='
+!       write(*,*) N2(1,0:nband+1)
+!       write(*,*) N2(2,0:nband+1)
+!       write(*,*) N2(3,0:nband+1)
+!       write(*,*) N2(4,0:nband+1)
+!       write(*,*) ''
+!     end if
+
+!     ! Despite possible unmatches, it sends N to the procs
+!     do iproc=1,np-1
+!       call MPI_SEND(N2,4*(nband2+2),MPI_INTEGER,iproc,121*iproc,MPI_COMM_WORLD,ierr)
+!     end do
+
+!     ! nxx(j) and nzz(j) store the number of points at a plane j
+!     allocate(nxxu(N2(4,0):N2(4,nband)+1),nzzu(N2(4,0):N2(4,nband)+1))
+!     allocate(nxxv(N2(3,0):N2(3,nband)+1),nzzv(N2(3,0):N2(3,nband)+1))
+!     allocate(nxxp(N2(4,0)+1:N2(4,nband)+1-1),nzzp(N2(4,0)+1:N2(4,nband)+1-1))
+!     nxxu(N2(4,0))=N2(1,1)+2
+!     nzzu(N2(4,0))=N2(2,1)
+!     nxxv(N2(3,0))=N2(1,1)+2
+!     nzzv(N2(3,0))=N2(2,1)
+!     nxxp(N2(4,0)+1)=N2(1,1)+2
+!     nzzp(N2(4,0)+1)=N2(2,1)
+!     do iband=1,nband
+!       do j=N2(4,iband-1)+1,N2(4,iband)
+!         nxxu(j)=N2(1,iband)+2
+!         nzzu(j)=N2(2,iband)
+!       end do
+!       do j=N2(3,iband-1)+1,N2(3,iband)
+!         nxxv(j)=N2(1,iband)+2
+!         nzzv(j)=N2(2,iband)
+!       end do
+!       do j=max(N2(4,iband-1),N2(4,0)+1),min(N2(4,iband),N2(4,nband)-1)
+!         nxxp(j)=N2(1,iband)+2
+!         nzzp(j)=N2(2,iband)
+!       end do
+!       nxxp(N2(4,1))=nxxp(N2(4,1)+1)
+!       nzzp(N2(4,1))=nzzp(N2(4,1)+1)
+!       nxxp(N2(4,2))=nxxp(N2(4,2)-1)
+!       nzzp(N2(4,2))=nzzp(N2(4,2)-1)
+!       nxxp(N2(4,2)+1)=nxxp(N2(4,2)-1)
+!       nzzp(N2(4,2)+1)=nzzp(N2(4,2)-1)
+!     end do
+!     nxxu(N2(4,nband)+1)=N2(1,nband)+2
+!     nzzu(N2(4,nband)+1)=N2(2,nband)
+!     nxxv(N2(3,nband)+1)=N2(1,nband)+2
+!     nzzv(N2(3,nband)+1)=N2(2,nband)
+!     nxxp(N2(4,nband)+1-1)=N2(1,nband)+2
+!     nzzp(N2(4,nband)+1-1)=N2(2,nband)
+!     !filout=fnameimb(3:index(fnameimb,' ')-1)
+!     !filout=fnameimb(10:index(fnameimb,' ')-1) !22 as now in subfolder
+
+!     write(*,*) 'getting'
+
+!     ! Reads u1, u2, u3 and p,  and send them to the procs
+
+!     !!!!!!!!!!!!!!    u1    !!!!!!!!!!!!!!
+!     fnameimb = trim(dirin)//'/u1'//filout
+!     write(*,*) 'u1 from file ',trim(fnameimb),','
+!     open(10,file=fnameimb,form='unformatted')
+!     read(10)
+!     read(10)
+!     read(10)
+!     ju1=jgal(2,1)-1
+!     ju2=jgal(2,2)
+!     ju1=max(ju1,N2(4,0))
+!     do j=N2(4,0),ju1-1
+!       read(10)
+!     end do
+!     do j=ju1,ju2
+!       nx=nxxu(j)
+!       nz=nzzu(j)
+!       allocate(buffSR(nx,nz))
+!       read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!       call buff_to_u(u1PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!       if (nx/=nxin .or. nz/=nzin) then
+!         write(*,*) 'WARNING!: unexpected size of plane',j
+!       end if
+!     end do
+!     do iproc=1,np-1
+!       ju1=planelim(2,1,iproc)
+!       ju2=planelim(2,2,iproc)
+!       if (planelim(2,2,iproc)==N(4,nband)) then
+!         ju2=planelim(2,2,iproc)+1
+!       end if
+!       ju1=max(ju1,N2(4,0))
+!       ju2=min(ju2,N2(4,nband)+1)
+!       do j=ju1,ju2
+!         nx=nxxu(j)
+!         nz=nzzu(j)
+!         allocate(buffSR(nx,nz))
+!         read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!         call MPI_SEND(buffSR,nx*nz,MPI_REAL8,iproc,123*iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(buffSR)
+!         if (nx/=nxin .or. nz/=nzin) then
+!           write(*,*) 'WARNING!: unexpected size of plane',j
+!         end if
+!       end do
+!     end do
+!     close(10)
+
+!     !!!!!!!!!!!!!!    u2    !!!!!!!!!!!!!!
+!     fnameimb = trim(dirin)//'/u2'//filout
+!     write(*,*) 'u2 from file ',trim(fnameimb),','
+!     open(10,file=fnameimb,form='unformatted')
+!     read(10)
+!     read(10)
+!     read(10)
+!     jv1=jgal(1,1)-1
+!     jv2=jgal(1,2)
+!     jv1=max(jv1,N2(3,0))
+!     do j=N2(3,0),jv1-1
+!       read(10)
+!     end do
+!     do j=jv1,jv2
+!       nx=nxxv(j)
+!       nz=nzzv(j)
+!       allocate(buffSR(nx,nz))
+!       read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!       call buff_to_u(u2PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!       if (nx/=nxin .or. nz/=nzin) then
+!         write(*,*) 'WARNING!: unexpected size of plane',j
+!       end if
+!     end do
+!     do iproc=1,np-1
+!       jv1=planelim(1,1,iproc)
+!       jv2=planelim(1,2,iproc)
+!       if (planelim(1,2,iproc)==N(3,nband).and.iproc==np-1) then
+!         jv2=planelim(1,2,iproc)+1
+!       end if
+!       jv1=max(jv1,N2(3,0))
+!       jv2=min(jv2,N2(3,nband)+1)
+! !jv2=min(jv2,N2(3,nband))
+!       do j=jv1,jv2
+!         nx=nxxv(j)
+!         nz=nzzv(j)
+!         allocate(buffSR(nx,nz))
+!         read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!         call MPI_SEND(buffSR,nx*nz,MPI_REAL8,iproc,124*iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(buffSR)
+!         if (nx/=nxin .or. nz/=nzin) then
+!           write(*,*) 'WARNING!: unexpected size of plane',j
+!         end if
+!       end do
+!     end do
+!     close(10)
+
+!     !!!!!!!!!!!!!!    u3    !!!!!!!!!!!!!!
+!     fnameimb = trim(dirin)//'/u3'//filout
+!     write(*,*) 'u3 from file ',trim(fnameimb),','
+!     open(10,file=fnameimb,form='unformatted')
+!     read(10)
+!     read(10)
+!     read(10)
+!     ju1=jgal(2,1)-1
+!     ju2=jgal(2,2)
+!     ju1=max(ju1,N2(4,0))
+!     do j=N2(4,0),ju1-1
+!       read(10)
+!     end do
+!     do j=ju1,ju2
+!       nx=nxxu(j)
+!       nz=nzzu(j)
+!       allocate(buffSR(nx,nz))
+!       read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!       call buff_to_u(u3PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!       if (nx/=nxin .or. nz/=nzin) then
+!         write(*,*) 'WARNING!: unexpected size of plane',j
+!       end if
+!     end do
+!     do iproc=1,np-1
+!       ju1=planelim(2,1,iproc)
+!       ju2=planelim(2,2,iproc)
+!       if (planelim(2,2,iproc)==N(4,nband)) then
+!         ju2=planelim(2,2,iproc)+1
+!       end if
+!       ju1=max(ju1,N2(4,0))
+!       ju2=min(ju2,N2(4,nband)+1)
+!       do j=ju1,ju2
+!         nx=nxxu(j)
+!         nz=nzzu(j)
+!         allocate(buffSR(nx,nz))
+!         read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!         call MPI_SEND(buffSR,nx*nz,MPI_REAL8,iproc,125*iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(buffSR)
+!         if (nx/=nxin .or. nz/=nzin) then
+!           write(*,*) 'WARNING!: unexpected size of plane',j
+!         end if
+!       end do
+!     end do
+!     close(10)
+
+!     !!!!!!!!!!!!!!    p     !!!!!!!!!!!!!!
+
+!     fnameimb = trim(dirin)//'/p'//filout
+!     write(*,*) 'and p from file ',trim(fnameimb),','
+!     open(10,file=fnameimb,form='unformatted')
+!     read(10)
+!     read(10)
+!     read(10)
+!     jp1=jgal(3,1)-1
+!     jp2=jgal(3,2)
+!     jp1=max(jp1,N2(4,0)+1)
+!     do j=N2(4,0)+1,jp1-1
+!       read(10)
+!     end do
+!     do j=jp1,jp2
+!       nx=nxxp(j)
+!       nz=nzzp(j)
+!       allocate(buffSR(nx,nz))
+!       read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!       call buff_to_u(ppPL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!       if (nx/=nxin .or. nz/=nzin) then
+!         write(*,*) 'WARNING!: unexpected size of plane',j
+!       end if
+!     end do
+!     do iproc=1,np-1
+!       jp1=planelim(3,1,iproc)
+!       jp2=planelim(3,2,iproc)
+!       if (planelim(3,2,iproc)==N(4,nband)-1.and.iproc==np-1) then
+!         jp2=planelim(3,2,iproc)+1
+!       end if
+!       jp1=max(jp1,N2(4,0)+1)
+!       jp2=min(jp2,N2(4,nband)+1-1)
+! !jp2=min(jp2,N2(4,nband)+1-1-1)
+!       do j=jp1,jp2
+!         nx=nxxp(j)
+!         nz=nzzp(j)
+!         allocate(buffSR(nx,nz))
+!         read(10) jin,dummI,nxin,nzin,dummRe,buffSR
+!         call MPI_SEND(buffSR,nx*nz,MPI_REAL8,iproc,126*iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(buffSR)
+!         if (nx/=nxin .or. nz/=nzin) then
+!           write(*,*) 'WARNING!: unexpected size of plane',j
+!         end if
+!       end do
+!     end do
+!     close(10)
+!     write(*,*) ''
+
+!     deallocate(nxxu,nzzu,nxxv,nzzv,nxxp,nzzp)
+!     deallocate(N2)
+
+!   else
+
+!     ! The procs receive u1, u2, u3 and p
+!     ! Those variables are stored in u1PL, u2PL, u3PL and ppPL
+!     ! The procs only stores the planes they have to compute
+!     !  (jgal is the local name of planelim for j)
+
+!     allocate(N2(4,0:nband+1))
+!     call MPI_RECV(N2,4*(nband+2),MPI_INTEGER,0,121*myid,MPI_COMM_WORLD,status,ierr)
+!     allocate(nxxu(N2(4,0):N2(4,nband)+1),nzzu(N2(4,0):N2(4,nband)+1))
+!     allocate(nxxv(N2(3,0):N2(3,nband)+1),nzzv(N2(3,0):N2(3,nband)+1))
+!     nxxu(N2(4,0))=N2(1,1)+2
+!     nzzu(N2(4,0))=N2(2,1)
+!     nxxv(N2(3,0))=N2(1,1)+2
+!     nzzv(N2(3,0))=N2(2,1)
+!     do iband=1,nband
+!       do j=N2(4,iband-1)+1,N2(4,iband)
+!         nxxu(j)=N2(1,iband)+2
+!         nzzu(j)=N2(2,iband)
+!       end do
+!       do j=N2(3,iband-1)+1,N2(3,iband)
+!         nxxv(j)=N2(1,iband)+2
+!         nzzv(j)=N2(2,iband)
+!       end do
+!     end do
+!     nxxu(N2(4,nband)+1)=N2(1,nband)+2
+!     nzzu(N2(4,nband)+1)=N2(2,nband)
+!     nxxv(N2(3,nband)+1)=N2(1,nband)+2
+!     nzzv(N2(3,nband)+1)=N2(2,nband)
+   
+!     ju1=jgal(2,1)
+!     ju2=jgal(2,2)
+!     if (jgal(2,2)==N(4,nband)) then
+!       ju2=jgal(2,2)+1
+!     end if
+!     ju1=max(ju1,N2(4,0))
+!     ju2=min(ju2,N2(4,nband)+1)
+!     jv1=jgal(1,1)
+!     jv2=jgal(1,2)
+!     if (jgal(1,2)==N(3,nband).and.myid==np-1) then
+!       jv2=jgal(1,2)+1
+!     end if
+!     jv1=max(jv1,N2(3,0))
+!     jv2=min(jv2,N2(3,nband)+1)
+! !jv2=min(jv2,N2(3,nband)+1-1)
+!     jp1=jgal(3,1)
+!     jp2=jgal(3,2)
+!     if (jgal(3,2)==N(4,nband)-1.and.myid==np-1) then
+!       jp2=jgal(3,2)+1
+!     end if
+!     jp1=max(jp1,N2(4,0)+1)
+!     jp2=min(jp2,N2(4,nband)+1-1)
+! !jp2=min(jp2,N2(4,nband)+1-1-1)
+!     !!!!!!!!!!!!!!    u1    !!!!!!!!!!!!!!
+!     do j=ju1,ju2
+!       nx=nxxu(j)
+!       nz=nzzu(j)
+!       allocate(buffSR(nx,nz))
+!       call MPI_RECV(buffSR,nx*nz,MPI_REAL8,0,123*myid,MPI_COMM_WORLD,status,ierr)
+!       call buff_to_u(u1PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!     end do
+!     !!!!!!!!!!!!!!    u2    !!!!!!!!!!!!!!
+!     do j=jv1,jv2
+!       nx=nxxv(j)
+!       nz=nzzv(j)
+!       allocate(buffSR(nx,nz))
+!       call MPI_RECV(buffSR,nx*nz,MPI_REAL8,0,124*myid,MPI_COMM_WORLD,status,ierr)
+!       call buff_to_u(u2PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!     end do
+!     !!!!!!!!!!!!!!    u3    !!!!!!!!!!!!!!
+!     do j=ju1,ju2
+!       nx=nxxu(j)
+!       nz=nzzu(j)
+!       allocate(buffSR(nx,nz))
+!       call MPI_RECV(buffSR,nx*nz,MPI_REAL8,0,125*myid,MPI_COMM_WORLD,status,ierr)
+!       call buff_to_u(u3PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!     end do
+!     !!!!!!!!!!!!!!    p     !!!!!!!!!!!!!!
+!     do j=jp1,jp2
+!       nx=nxxu(j)
+!       nz=nzzu(j)
+!       allocate(buffSR(nx,nz))
+!       call MPI_RECV(buffSR,nx*nz,MPI_REAL8,0,126*myid,MPI_COMM_WORLD,status,ierr)
+!       call buff_to_u(ppPL(1,1,j),buffSR,nx,nz,igal,kgal)
+!       deallocate(buffSR)
+!     end do
+!     deallocate(nxxu,nzzu,nxxv,nzzv)
+!     deallocate(N2)
+!   end if
+
+! end subroutine
+
+
+
 
 subroutine init_stats(myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3999,6 +4893,12 @@ subroutine init_stats(myid)
 
 end subroutine
 
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!    nonlin read NEW   !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
 subroutine nonlinRead
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!!!!!!!!    read in important interactions  !!!!!!!!!!!!!!
@@ -4016,30 +4916,21 @@ subroutine nonlinRead
   character*2 extj
   integer, allocatable :: tmpInt(:)
 
-  jlow = min(jgal(vgrid, 1), jgal(ugrid, 1))
-  jupp = max(jgal(vgrid, 2), jgal(ugrid, 2))
-
-  !write(6,*) "jgal", size(jgal,1), size(jgal,2)
-
-  ! ! jgal is (3,2)
-  ! write(6,*) "jgal ="
-  ! do i = 1, 3
-  !     write(6,*) jgal(i,1), jgal(i,2)
-  ! end do
-
-  ! write(6,*) "ngal", size(ngal,1), size(ngal,2)
-  ! write(6,*) "ngal:"
-  ! do i = 1,4
-  !   write(6,*) ngal(i,0:4)
-  ! end do
+  jlow = N(4,0) +1 
+  jupp = N(4,nband)-1
 
 
-  if (jlow > (Ngal(3,nband)+1)/2) then !! bad :/
-    jlow = jlow-1
-  end if
-  jupp = min(jupp,Ngal(3,nband))
+  ! if (jlow > (Ngal(3,nband)+1)/2) then !! bad :/
+  !   jlow = jlow-1
+  ! end if
+  ! jupp = min(jupp,Ngal(3,nband))
 
   allocate(nonlin(jlow:jupp,9))
+
+  if (allocated(weight)) deallocate(weight)
+  allocate(weight(jlow:jupp))
+  weight(jlow:jupp) = 0   ! initialise
+
 
   do j = jlow,jupp
     if (j > (Ngal(3,nband)+1)/2) then
@@ -4055,10 +4946,10 @@ subroutine nonlinRead
 
     allocate(tmpInt(3))
     read(40) tmpInt
-    if (tmpInt(1)/= N(1,2)/2-1) then
+    if (tmpInt(1)/= N(1,nband)/2-1) then
       write(*,*) "nx number does not agree between list and simulation"
       stop
-    elseif (tmpInt(2)/= N(2,2)/2-1) then
+    elseif (tmpInt(2)/= N(2,nband)/2-1) then
       write(*,*) "nz number does not agree between list and simulation"
       stop
     elseif (tmpInt(3)/= jread) then
@@ -4068,11 +4959,14 @@ subroutine nonlinRead
     deallocate(tmpInt)
     
     allocate(tmpInt(2))
+    
 
+    weight(j)=0
     do x = 1,9
       read(40) tmpInt
       type = tmpInt(1)
       length = tmpInt(2)
+      weight(j) = weight(j) + length
       allocate(nonlin(j,type)%list(length,4))
       read(40) nonlin(j,type)%list
       ! do len = 1,length
@@ -4080,9 +4974,106 @@ subroutine nonlinRead
       ! end do 
     end do
 
+
+    !write(6,*) "j=", j, "weight", weight(j)
+
+
     deallocate(tmpInt)
     close(40)
   end do
 
 
 end subroutine
+
+
+! subroutine nonlinRead
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   !!!!!!!!!!!!    nonlin read OLD   !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!   ! currently quite bad, only works for bands of the same size
+!   ! also file read with access = stream is bad
+!   ! also some files are read multiple times due to upper and lower channel
+!   ! also the load in each processor is not perfectly balanced
+
+!   use declaration
+!   implicit none
+
+!   integer j, jread, x, type, length, jlow, jupp, len, i
+!   character*2 extj
+!   integer, allocatable :: tmpInt(:), weight(:)
+
+!   jlow = min(jgal(vgrid, 1), jgal(ugrid, 1))
+!   jupp = max(jgal(vgrid, 2), jgal(ugrid, 2))
+
+!   !write(6,*) "jgal", size(jgal,1), size(jgal,2)
+
+!   ! ! jgal is (3,2)
+!   ! write(6,*) "jgal ="
+!   ! do i = 1, 3
+!   !     write(6,*) jgal(i,1), jgal(i,2)
+!   ! end do
+
+!   ! write(6,*) "ngal", size(ngal,1), size(ngal,2)
+!   ! write(6,*) "ngal:"
+!   ! do i = 1,4
+!   !   write(6,*) ngal(i,0:4)
+!   ! end do
+
+
+!   if (jlow > (Ngal(3,nband)+1)/2) then !! bad :/
+!     jlow = jlow-1
+!   end if
+!   jupp = min(jupp,Ngal(3,nband))
+
+!   allocate(nonlin(jlow:jupp,9))
+
+!   do j = jlow,jupp
+!     if (j > (Ngal(3,nband)+1)/2) then
+!       jread = Ngal(3,nband)+1-j
+!     else 
+!       jread = j
+!     end if
+!     write(extj,'(i2.2)') jread
+
+!     fnameima = trim(dirlist)//trim(heading)//extj//'.dat'
+    
+!     open(40, file=fnameima, form='unformatted',access='stream', status='old')
+
+!     allocate(tmpInt(3))
+!     read(40) tmpInt
+!     if (tmpInt(1)/= N(1,2)/2-1) then
+!       write(*,*) "nx number does not agree between list and simulation"
+!       stop
+!     elseif (tmpInt(2)/= N(2,2)/2-1) then
+!       write(*,*) "nz number does not agree between list and simulation"
+!       stop
+!     elseif (tmpInt(3)/= jread) then
+!       write(*,*) "something wrong with the j index of the list"
+!       stop
+!     end if
+!     deallocate(tmpInt)
+    
+!     allocate(tmpInt(2))
+!     allocate(weight(jlow:jupp))
+
+
+!     weight(j)=0
+!     do x = 1,9
+!       read(40) tmpInt
+!       type = tmpInt(1)
+!       length = tmpInt(2)
+!       weight(j) = weight(j) + length
+!       allocate(nonlin(j,type)%list(length,4))
+!       read(40) nonlin(j,type)%list
+!       ! do len = 1,length
+!       !   read(40) nonlin(j,type)%list(len,:)
+!       ! end do 
+!     end do
+
+!     deallocate(tmpInt)
+!     close(40)
+!   end do
+
+
+! end subroutine
