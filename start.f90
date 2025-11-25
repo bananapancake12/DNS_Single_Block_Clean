@@ -502,9 +502,7 @@ end if
   ! Calculates the different variables that define planes (phys) and pencils (spectral) for every proc 
   ! Computes planelim, bandPL, crossband and dk 
   ! Computes sband and eband
-  !call proc_lims(myid)
-  write(6,*) "proc lims cols"
-
+  !write(6,*) "meow"
   call proc_lims_columns(myid)
 
   !! added nonlin read here so read before allocating proc_lims_planes
@@ -2401,12 +2399,12 @@ subroutine proc_lims_columns(myid)
   integer :: ierr,status
 
   integer :: iblock, iband, iproc, accum, column, i, k, myid
-  integer :: columns_num_total, columns_num_long, columns_num_short
+  integer :: columns_num_total !columns_num_long, columns_num_short
   integer :: max_columns_num
-  integer :: columns_num_short_proc, columns_num_short_proc_rem
-  integer :: columns_num_long_proc,  columns_num_long_proc_rem
-  integer, allocatable :: columns_short_list_i(:), columns_short_list_k(:)
-  integer, allocatable :: columns_long_list_i(:) , columns_long_list_k(:)
+  ! integer :: columns_num_short_proc, columns_num_short_proc_rem
+  ! integer :: columns_num_long_proc,  columns_num_long_proc_rem
+  ! integer, allocatable :: columns_short_list_i(:), columns_short_list_k(:)
+  ! integer, allocatable :: columns_long_list_i(:) , columns_long_list_k(:)
 
   integer :: columns_num_total_proc_rem, columns_num_total_proc
   integer, allocatable :: columns_total_list_i(:) , columns_total_list_k(:)
@@ -2414,6 +2412,7 @@ subroutine proc_lims_columns(myid)
   integer :: postpointsx,postpointsz,texturepointsx,texturepointsz
   integer :: ip,kp
   
+  write(6,*) '>>> entered proc_lims_columns, myid =', myid
   ! Creating list of columns with x and z coordinates:
   !   columns_i(column_index,iband,myid), columns_k(column_index,iband,myid) and columns_num(iband,myid)
 
@@ -2686,6 +2685,7 @@ subroutine proc_lims_columns(myid)
   
 ! !planeBC = 1 !2 - Free-shear
 ! !bslip = (0.535d0*6d0)/(180d0)
+!write(6,*) '>>> finished proc_lims_columns, myid =', myid
   
 end subroutine
 
