@@ -21,21 +21,21 @@ subroutine inst_sl_stats(u1,u3,myid,status,ierr)
      fnameimc = 'sl_stats_inst_'//ext1//'x'//ext2//'x'//ext3//'_'//ext4//'.dat'
    end if
     
-  do iband=1,2
+  !do iband=1,2
     do column = 1,columns_num(myid)
       j = jlim(1,vgrid)
-      du1dy_columns(iband)%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns(iband)%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
-  enddo
+  !enddo
   
-  do iband=2,3
+  !do iband=2,3
     do column = 1,columns_num(myid)
       j = jlim(2,vgrid)
-      du1dy_columns(iband)%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns(iband)%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
-  enddo
+  !enddo
 
   du1dy_PL = 0d0
   du3dy_PL = 0d0

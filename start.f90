@@ -503,7 +503,8 @@ end if
   ! Computes planelim, bandPL, crossband and dk 
   ! Computes sband and eband
   !call proc_lims(myid)
-  !write(6,*) "proc lims cols"
+  write(6,*) "proc lims cols"
+
   call proc_lims_columns(myid)
 
   !! added nonlin read here so read before allocating proc_lims_planes
@@ -516,11 +517,11 @@ end if
   end if
   call nonlinRead
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  !write(*,*) 'finished reading nonlinear interaction list'
+  ! write(*,*) 'finished reading nonlinear interaction list'
 
-  write(6,*) "proc lims planes"
+  ! write(6,*) "proc lims planes"
   call proc_lims_planes (myid)
-  !write(6,*) "finished proc lims planes"
+  ! write(6,*) "finished proc lims planes"
 
   ! block
   !   integer :: r

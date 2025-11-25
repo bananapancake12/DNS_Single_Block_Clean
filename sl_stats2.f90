@@ -78,16 +78,16 @@ istat_sl=istat_sl+1
   do iband=1,2
     do column = 1,columns_num(myid)
       j = jlim(1,vgrid)
-      du1dy_columns(iband)%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns(iband)%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
   enddo
   
   do iband=2,3
     do column = 1,columns_num(myid)
       j = jlim(2,vgrid)
-      du1dy_columns(iband)%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns(iband)%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
     enddo
   enddo
   

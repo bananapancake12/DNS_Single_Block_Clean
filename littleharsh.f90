@@ -181,6 +181,7 @@ nstatsl = nwrite
   write(*,*) 'finished getini'
 
 nextqt = floor(t*10d0)/10d0+0.1d0
+!write(*,*) 'nextqt'
   
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
   if (myid==0) then
