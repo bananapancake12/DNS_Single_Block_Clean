@@ -20,7 +20,7 @@ F77 = mpif90
 #F90FLAGS = -c -warn -CB -debug extended
 # Debug flags (default for most files)
 # Use portable flags (-c/-O0/-g) so the wrapper compiler (mpif90) accepts them
-DEBUG_F90FLAGS = -c -O0 -g
+DEBUG_F90FLAGS = -c -O0 -g -check bounds -traceback #-fpe0 #-warn all 
 DEBUG_F77FLAGS = -c
 # FFT / performance-critical flags (used for FFT sources)
 FFT_F90FLAGS   = -c 

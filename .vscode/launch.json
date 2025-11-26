@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Debug MPI littleharsh (8 ranks)",
+      "type": "cppdbg",
+      "request": "launch",
+
+      "program": "/usr/local/software/spack/spack-views/rocky8-icelake-20220710/intel-oneapi-mpi-2021.6.0/intel-2021.6.0/guxuvcpmykplbrr2e3af2yd7njqhau5e/mpi/2021.6.0/bin/mpirun",
+
+      "args": [
+        "-np", "8",
+        "/home/ld751/rds/hpc-work/single_block/RNL_single_block/littleharsh"
+        // or "${workspaceFolder}/littleharsh" if your VS Code workspace is that folder
+      ],
+
+      "cwd": "/home/ld751/rds/hpc-work/single_block/RNL_single_block",
+
+      "stopAtEntry": false,
+      "externalConsole": false,
+
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb"   // change if `which gdb` says something else
+
+      // optional but nice:
+      // "setupCommands": [
+      //   { "text": "handle SIGFPE stop" },
+      //   { "text": "handle SIGSEGV stop" },
+      //   { "text": "handle SIGBUS stop" }
+      // ]
+    }
+  ]
+}

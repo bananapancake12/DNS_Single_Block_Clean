@@ -2188,47 +2188,47 @@ subroutine planes_to_modes_UVP (x,xPL,grid,myid,status,ierr)
 
   real :: t_start, t_end
 
-  integer i,k,j,jminS,jmaxS,jminR,jmaxR,plband,grid
+  integer i,k,j,jminS,jmaxS,jminR,jmaxR,grid
   integer column
   integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
+  type(cfield) x  
   real(8)      xPL(igal,kgal,jgal(grid,1)-1:jgal(grid,2)+1)
   complex(8), allocatable:: buffS(:,:),buffR(:,:)
 
-  write(6,*) "starting self transpose"
+  ! write(6,*) "starting self transpose"
 
   ! Loop for itself
   ! Transpose the cube that it already owns
-  plband = bandPL(myid) ! Return the band (phys) the proc works at
+  ! plband = bandPL(myid) ! Return the band (phys) the proc works at
   ! do iband = sband,eband
 
   jminR = max(limPL_excw(grid,1,myid),jlim(1,grid)+1)  ! Select the planes to transpose 
   jmaxR = min(limPL_excw(grid,2,myid),jlim(2,grid)-1)
 
-  write(6,*) "interfaces"
+  !write(6,*) "interfaces"
 
-  if (jminR==Ny(grid,plband-1)+1 .and. jmaxR>=jminR) then   ! Special cases: interfaces
+  if (jminR==Ny(grid,nband-1)+1 .and. jmaxR>=jminR) then   ! Special cases: interfaces
     jminR = jminR-1
   end if
-  if (jmaxR==Ny(grid,plband  )   .and. jmaxR>=jminR) then
+  if (jmaxR==Ny(grid,nband  )   .and. jmaxR>=jminR) then
     jmaxR = jmaxR+1
   end if
 
-  write(6,*) "acc transposing"
+  ! write(6,*) "acc transposing"
 
   do j = jminR,jmaxR
     do column = 1,columns_num(myid)
       i = columns_i(column,myid)
       k = columns_k(column,myid) - dk(column,myid)
-      x(iband)%f(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j)) ! Transposition: Reordering from XZY to YC
+      x%f(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j)) ! Transposition: Reordering from XZY to YC
     end do
   end do
 
   !end do
 
-  write(6,*) "finished self transpose"
+  ! write(6,*) "finished self transpose"
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)   ! XOR. It's used to pair procs 1-to-1
@@ -2289,8 +2289,8 @@ subroutine planes_to_modes_UVP (x,xPL,grid,myid,status,ierr)
 
         ! call cpu_time(t_start)
         
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &   ! SEND_RECV so it can send and receive at the same time
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
+        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &   ! SEND_RECV so it can send and receive at the same time
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
 &                         MPI_COMM_WORLD,status,ierr)
 
         ! call cpu_time(t_end)
@@ -2301,7 +2301,7 @@ subroutine planes_to_modes_UVP (x,xPL,grid,myid,status,ierr)
 
         do j=jminR,jmaxR
           do column = 1,columns_num(myid)
-            x(iband)%f(j,column) = buffR(j,column)                         ! Store the data received
+            x%f(j,column) = buffR(j,column)                         ! Store the data received
           end do
         end do
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -5,16 +5,20 @@ subroutine init_sl_stats(myid)
   
   integer myid
 
-  allocate(du1dy_PL(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(du3dy_PL(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  !write(6,*) "jgal", jgal(vgrid,1), jgal(vgrid,2), myid
   
-  allocate(u1_f_PL(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
-  allocate(u3_f_PL(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du1dy_PL(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(du3dy_PL(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
   
-  allocate(bslip_u1_M(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  allocate(bslip_du1dy_M(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  allocate(bslip_u3_M(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  allocate(bslip_du3dy_M(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
+  allocate(u1_f_PL(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+  allocate(u3_f_PL(N(1,nband)+2,N(2,nband),jgal(vgrid,1)-1:jgal(vgrid,2)+1))
+
+  !write(6,*) "size du1dy_PL", size(du1dy_PL,1), myid
+  
+  allocate(bslip_u1_M(N(1,nband)+2,N(2,nband)))
+  allocate(bslip_du1dy_M(N(1,nband)+2,N(2,nband)))
+  allocate(bslip_u3_M(N(1,nband)+2,N(2,nband)))
+  allocate(bslip_du3dy_M(N(1,nband)+2,N(2,nband)))
 
   bslip_u1_M=0d0
   bslip_du1dy_M=0d0

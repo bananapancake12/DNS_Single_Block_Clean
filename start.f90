@@ -58,10 +58,10 @@ subroutine start(myid,status,ierr)
   include 'mpif.h'            ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid
 
-  integer iband,iproc,inputInt(15),k
+  integer iproc,inputInt(15),k
   integer i
   real(8) inputR(20)           ! Message passing array containing input parameters
-  logical :: do_minimal_start
+
 
 
   iproc = 0
@@ -772,7 +772,7 @@ end if
   allocate(   wx(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1  :jgal(vgrid,2)+1  ))
 
 
-  ! write(6,*) " STallocating final bits "
+
   ! iband = midband
   allocate(spU (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid)))
   allocate(spV (jlim(1,vgrid):jlim(2,vgrid),columns_num(myid)))
@@ -1450,7 +1450,7 @@ subroutine ygrid
 
   use declaration
   implicit none
-  integer j,iband,sumj,i
+  integer j,i
   real(8) aaa,bbb,qqq,dy0,ddy,y0
 
   nn  = N(3,top_domain)+1 !v points (as collocated points)
@@ -1521,7 +1521,8 @@ subroutine ygrid
   end do
 
   ! do j= 1,nn-1
-  !   write(6,*) "j", j, "dyu2i=", dyu2i(1,j), dyu2i(2,j), dyu2i(3,j), "dyv2i=" , dyv2i(1,j), dyv2i(2,j), dyv2i(3,j)
+  !   write(6,*) dyu2i(1,j), dyu2i(2,j), dyu2i(3,j)
+  !   ! write(6,*) dyv2i(1,j), dyv2i(2,j), dyv2i(3,j)
   ! end do
 
   j=nn
@@ -2082,299 +2083,299 @@ end subroutine
   
 ! end subroutine
 
-subroutine getbounds(myid,status,ierr)
-! TODO check
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!    GETBOUNDS   !!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! subroutine getbounds(myid,status,ierr)
+! ! TODO check
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!    GETBOUNDS   !!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-! This function send to every proc a list containing points (and weights) of the immersed boundary.
-!  If the planes a proc has to solve are in the middle of the channel, the don't have to deal with the
-!  immersed boundaries, and then the list is empty.
+! ! This function send to every proc a list containing points (and weights) of the immersed boundary.
+! !  If the planes a proc has to solve are in the middle of the channel, the don't have to deal with the
+! !  immersed boundaries, and then the list is empty.
 
 
-  use declaration
-  implicit none
+!   use declaration
+!   implicit none
 
-  include 'mpif.h'             ! MPI variables
-  integer status(MPI_STATUS_SIZE),ierr,myid
+!   include 'mpif.h'             ! MPI variables
+!   integer status(MPI_STATUS_SIZE),ierr,myid
 
-  integer j,iproc,ilist,ilist2
-  integer nlist_ib1,nlist_ib2
-  integer, allocatable:: inputNu(:), inputNv(:)                 ! Message passing array containing input parameters
-  integer, allocatable:: list_ib1(:,:,:),list_ib2(:,:,:)
-  real(8), allocatable:: A_ib1(:,:,:),A_ib2(:,:,:)
-  integer, allocatable:: list_pointer(:,:)
+!   integer j,iproc,ilist,ilist2
+!   integer nlist_ib1,nlist_ib2
+!   integer, allocatable:: inputNu(:), inputNv(:)                 ! Message passing array containing input parameters
+!   integer, allocatable:: list_ib1(:,:,:),list_ib2(:,:,:)
+!   real(8), allocatable:: A_ib1(:,:,:),A_ib2(:,:,:)
+!   integer, allocatable:: list_pointer(:,:)
 
-  allocate(nlist_ib(2))
-  allocate(nyuIB1(0:np-1))
-  allocate(nyuIB2(0:np-1))
-  allocate(nyvIB1(0:np-1))
-  allocate(nyvIB2(0:np-1))
+!   allocate(nlist_ib(2))
+!   allocate(nyuIB1(0:np-1))
+!   allocate(nyuIB2(0:np-1))
+!   allocate(nyvIB1(0:np-1))
+!   allocate(nyvIB2(0:np-1))
 
-  ! if nribs==0, smooth channel
-  if (geometry_type/=2) then
-    nlist_ib = 0
-    nyuIB1   = -88
-    nyuIB2   = -99
-    nyvIB1   = -88
-    nyvIB2   = -99
-  else
-    allocate(inputNu(2*np+1+4))
-    allocate(inputNv(2*np+1+4))
+!   ! if nribs==0, smooth channel
+!   if (geometry_type/=2) then
+!     nlist_ib = 0
+!     nyuIB1   = -88
+!     nyuIB2   = -99
+!     nyvIB1   = -88
+!     nyvIB2   = -99
+!   else
+!     allocate(inputNu(2*np+1+4))
+!     allocate(inputNv(2*np+1+4))
 
-! MASTER
+! ! MASTER
 
-    if (myid==0) then
-      ! Creates the geometry. 
-      !  list_ib1 and list_ib2 store the points of the immersed boundaries for the lower and upper bands, resp.
-      !  ny11, ny21, ny12 and ny22 stores the y-limits of the imm boundaries. From bottom to top.
-      !  A_ib1 and A_ib2 stores the weights of the points in the imm boundaries.
-      write(*,*) 'Creating geometry'
-      call boundary
-      write(*,*) 'Attention, nlist_ib(ugrid) must be equal to nlist_ib(vgrid)'
+!     if (myid==0) then
+!       ! Creates the geometry. 
+!       !  list_ib1 and list_ib2 store the points of the immersed boundaries for the lower and upper bands, resp.
+!       !  ny11, ny21, ny12 and ny22 stores the y-limits of the imm boundaries. From bottom to top.
+!       !  A_ib1 and A_ib2 stores the weights of the points in the imm boundaries.
+!       write(*,*) 'Creating geometry'
+!       call boundary
+!       write(*,*) 'Attention, nlist_ib(ugrid) must be equal to nlist_ib(vgrid)'
 
-      open(10,file=boundfname,form='unformatted')
-      read(10) Lx,Ly,Lz
-      read(10) Ngal,nlist_ib1,nlist_ib2,nyu11,nyu21,nyu12,nyu22,nyv11,nyv21,nyv12,nyv22
-      allocate(list_ib1(6,nlist_ib1,2),list_ib2(6,nlist_ib2,2))
-      allocate(A_ib1   (1,nlist_ib1,2),A_ib2   (1,nlist_ib2,2))
-      read(10) list_ib1,list_ib2,A_ib1,A_ib2
-      close(10)
+!       open(10,file=boundfname,form='unformatted')
+!       read(10) Lx,Ly,Lz
+!       read(10) Ngal,nlist_ib1,nlist_ib2,nyu11,nyu21,nyu12,nyu22,nyv11,nyv21,nyv12,nyv22
+!       allocate(list_ib1(6,nlist_ib1,2),list_ib2(6,nlist_ib2,2))
+!       allocate(A_ib1   (1,nlist_ib1,2),A_ib2   (1,nlist_ib2,2))
+!       read(10) list_ib1,list_ib2,A_ib1,A_ib2
+!       close(10)
 
-      ! Tells every proc how many of their planes contain points of the immersed boundaries
-      do iproc = 0,np-1
-!TODO change these statements using pandPL or something similar
-        if (iproc<np/2) then                                ! Lower riblets
-          nyuIB1(iproc) = max(nyu11,planelim(ugrid,1,iproc))
-          nyuIB2(iproc) = min(nyu21,planelim(ugrid,2,iproc))
-          nyvIB1(iproc) = max(nyv11,planelim(vgrid,1,iproc))
-          nyvIB2(iproc) = min(nyv21,planelim(vgrid,2,iproc))
-        else                                                ! Upper riblets
-          nyuIB1(iproc) = max(nyu12,planelim(ugrid,1,iproc))
-          nyuIB2(iproc) = min(nyu22,planelim(ugrid,2,iproc))
-          nyvIB1(iproc) = max(nyv12,planelim(vgrid,1,iproc))
-          nyvIB2(iproc) = min(nyv22,planelim(vgrid,2,iproc))
-        end if
-      end do
+!       ! Tells every proc how many of their planes contain points of the immersed boundaries
+!       do iproc = 0,np-1
+! !TODO change these statements using pandPL or something similar
+!         if (iproc<np/2) then                                ! Lower riblets
+!           nyuIB1(iproc) = max(nyu11,planelim(ugrid,1,iproc))
+!           nyuIB2(iproc) = min(nyu21,planelim(ugrid,2,iproc))
+!           nyvIB1(iproc) = max(nyv11,planelim(vgrid,1,iproc))
+!           nyvIB2(iproc) = min(nyv21,planelim(vgrid,2,iproc))
+!         else                                                ! Upper riblets
+!           nyuIB1(iproc) = max(nyu12,planelim(ugrid,1,iproc))
+!           nyuIB2(iproc) = min(nyu22,planelim(ugrid,2,iproc))
+!           nyvIB1(iproc) = max(nyv12,planelim(vgrid,1,iproc))
+!           nyvIB2(iproc) = min(nyv22,planelim(vgrid,2,iproc))
+!         end if
+!       end do
 
-      ! Prepares the information of the LOWER riblets to be sent to half of the procs
-      do iproc = 1,np/2-1
-        nlist_ib = 0
-        allocate(list_pointer(nlist_ib1,2))
-        ! Checks the points of the imm boundaries that belong to planes of the proc 'iproc'
-        !  If the point is in one of those planes, it is added to a list
-        do ilist = 1,nlist_ib1
-          j = list_ib1(3,ilist,ugrid)                          ! 1:i 2:k 3:j
-          if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
-            nlist_ib(ugrid) = nlist_ib(ugrid)+1
-            list_pointer(nlist_ib(ugrid),ugrid) = ilist
-          end if
-        end do
-        do ilist = 1,nlist_ib1
-          j = list_ib1(3,ilist,vgrid)                          ! 1:i 2:k 3:j
-          if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
-            nlist_ib(vgrid) = nlist_ib(vgrid)+1
-            list_pointer(nlist_ib(vgrid),vgrid) = ilist
-          end if
-        end do
-        ! The list is reordered and stored in a local list
-        allocate(list_ib(6,nlist_ib(ugrid),2))
-        allocate(A_ib(1,nlist_ib(ugrid),2))
-        do ilist2 = 1,nlist_ib(ugrid)
-          ilist = list_pointer(ilist2,ugrid)
-          list_ib(1,ilist2,ugrid) = list_ib1(1,ilist,ugrid) ! i
-          list_ib(2,ilist2,ugrid) = list_ib1(2,ilist,ugrid) ! k
-          list_ib(3,ilist2,ugrid) = list_ib1(3,ilist,ugrid) ! j
-          list_ib(4,ilist2,ugrid) = list_ib1(4,ilist,ugrid)
-          list_ib(5,ilist2,ugrid) = list_ib1(5,ilist,ugrid)
-          list_ib(6,ilist2,ugrid) = list_ib1(6,ilist,ugrid)
-          A_ib   (1,ilist2,ugrid) = A_ib1   (1,ilist,ugrid)
-        end do
-        do ilist2 = 1,nlist_ib(vgrid)
-          ilist = list_pointer(ilist2,vgrid)
-          list_ib(1,ilist2,vgrid) = list_ib1(1,ilist,vgrid) ! i
-          list_ib(2,ilist2,vgrid) = list_ib1(2,ilist,vgrid) ! k
-          list_ib(3,ilist2,vgrid) = list_ib1(3,ilist,vgrid) ! j
-          list_ib(4,ilist2,vgrid) = list_ib1(4,ilist,vgrid)
-          list_ib(5,ilist2,vgrid) = list_ib1(5,ilist,vgrid)
-          list_ib(6,ilist2,vgrid) = list_ib1(6,ilist,vgrid)
-          A_ib   (1,ilist2,vgrid) = A_ib1   (1,ilist,vgrid)
-        end do
-        deallocate(list_pointer)
-        ! The list with 'imm boundary points you have to handle with' is sent to every proc
-        inputNu(1) = nlist_ib(ugrid)
-        inputNv(1) = nlist_ib(vgrid)
-        do j = 0,np-1
-          inputNu(j+2   ) = nyuIB1(j)
-          inputNu(j+2+np) = nyuIB2(j)
-          inputNv(j+2   ) = nyvIB1(j)
-          inputNv(j+2+np) = nyvIB2(j)
-        end do
-        inputNu(2*np+1+1) = nyu11
-        inputNu(2*np+1+2) = nyu21
-        inputNu(2*np+1+3) = nyu12
-        inputNu(2*np+1+4) = nyu22
-        inputNv(2*np+1+1) = nyv11
-        inputNv(2*np+1+2) = nyv21
-        inputNv(2*np+1+3) = nyv12
-        inputNv(2*np+1+4) = nyv22
-        call MPI_SEND(inputNu,2*np+1+4           ,MPI_INTEGER,iproc,20000+iproc,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(inputNv,2*np+1+4           ,MPI_INTEGER,iproc,24000+iproc,MPI_COMM_WORLD,ierr)
-        ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
-        call MPI_SEND(list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,iproc,21000+iproc,MPI_COMM_WORLD,ierr) 
-        call MPI_SEND(A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,iproc,23000+iproc,MPI_COMM_WORLD,ierr)
-        deallocate(list_ib)
-        deallocate(A_ib)
-      end do
+!       ! Prepares the information of the LOWER riblets to be sent to half of the procs
+!       do iproc = 1,np/2-1
+!         nlist_ib = 0
+!         allocate(list_pointer(nlist_ib1,2))
+!         ! Checks the points of the imm boundaries that belong to planes of the proc 'iproc'
+!         !  If the point is in one of those planes, it is added to a list
+!         do ilist = 1,nlist_ib1
+!           j = list_ib1(3,ilist,ugrid)                          ! 1:i 2:k 3:j
+!           if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
+!             nlist_ib(ugrid) = nlist_ib(ugrid)+1
+!             list_pointer(nlist_ib(ugrid),ugrid) = ilist
+!           end if
+!         end do
+!         do ilist = 1,nlist_ib1
+!           j = list_ib1(3,ilist,vgrid)                          ! 1:i 2:k 3:j
+!           if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
+!             nlist_ib(vgrid) = nlist_ib(vgrid)+1
+!             list_pointer(nlist_ib(vgrid),vgrid) = ilist
+!           end if
+!         end do
+!         ! The list is reordered and stored in a local list
+!         allocate(list_ib(6,nlist_ib(ugrid),2))
+!         allocate(A_ib(1,nlist_ib(ugrid),2))
+!         do ilist2 = 1,nlist_ib(ugrid)
+!           ilist = list_pointer(ilist2,ugrid)
+!           list_ib(1,ilist2,ugrid) = list_ib1(1,ilist,ugrid) ! i
+!           list_ib(2,ilist2,ugrid) = list_ib1(2,ilist,ugrid) ! k
+!           list_ib(3,ilist2,ugrid) = list_ib1(3,ilist,ugrid) ! j
+!           list_ib(4,ilist2,ugrid) = list_ib1(4,ilist,ugrid)
+!           list_ib(5,ilist2,ugrid) = list_ib1(5,ilist,ugrid)
+!           list_ib(6,ilist2,ugrid) = list_ib1(6,ilist,ugrid)
+!           A_ib   (1,ilist2,ugrid) = A_ib1   (1,ilist,ugrid)
+!         end do
+!         do ilist2 = 1,nlist_ib(vgrid)
+!           ilist = list_pointer(ilist2,vgrid)
+!           list_ib(1,ilist2,vgrid) = list_ib1(1,ilist,vgrid) ! i
+!           list_ib(2,ilist2,vgrid) = list_ib1(2,ilist,vgrid) ! k
+!           list_ib(3,ilist2,vgrid) = list_ib1(3,ilist,vgrid) ! j
+!           list_ib(4,ilist2,vgrid) = list_ib1(4,ilist,vgrid)
+!           list_ib(5,ilist2,vgrid) = list_ib1(5,ilist,vgrid)
+!           list_ib(6,ilist2,vgrid) = list_ib1(6,ilist,vgrid)
+!           A_ib   (1,ilist2,vgrid) = A_ib1   (1,ilist,vgrid)
+!         end do
+!         deallocate(list_pointer)
+!         ! The list with 'imm boundary points you have to handle with' is sent to every proc
+!         inputNu(1) = nlist_ib(ugrid)
+!         inputNv(1) = nlist_ib(vgrid)
+!         do j = 0,np-1
+!           inputNu(j+2   ) = nyuIB1(j)
+!           inputNu(j+2+np) = nyuIB2(j)
+!           inputNv(j+2   ) = nyvIB1(j)
+!           inputNv(j+2+np) = nyvIB2(j)
+!         end do
+!         inputNu(2*np+1+1) = nyu11
+!         inputNu(2*np+1+2) = nyu21
+!         inputNu(2*np+1+3) = nyu12
+!         inputNu(2*np+1+4) = nyu22
+!         inputNv(2*np+1+1) = nyv11
+!         inputNv(2*np+1+2) = nyv21
+!         inputNv(2*np+1+3) = nyv12
+!         inputNv(2*np+1+4) = nyv22
+!         call MPI_SEND(inputNu,2*np+1+4           ,MPI_INTEGER,iproc,20000+iproc,MPI_COMM_WORLD,ierr)
+!         call MPI_SEND(inputNv,2*np+1+4           ,MPI_INTEGER,iproc,24000+iproc,MPI_COMM_WORLD,ierr)
+!         ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
+!         call MPI_SEND(list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,iproc,21000+iproc,MPI_COMM_WORLD,ierr) 
+!         call MPI_SEND(A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,iproc,23000+iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(list_ib)
+!         deallocate(A_ib)
+!       end do
 
-      ! Prepares the information of the UPPER riblets to be sent to half of the procs
-      do iproc = np/2,np-1
-        nlist_ib = 0
-        allocate(list_pointer(nlist_ib2,2))
-        ! Checks the points of the imm boundaries that belong to planes of the proc 'iproc'
-        !  If the point is in one of those planes, it is added to a list
-        do ilist = 1,nlist_ib2
-          j = list_ib2(3,ilist,ugrid)
-          if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
-            nlist_ib(ugrid) = nlist_ib(ugrid)+1
-            list_pointer(nlist_ib(ugrid),ugrid) = ilist
-          end if
-        end do
-        do ilist = 1,nlist_ib2
-          j = list_ib2(3,ilist,vgrid)
-          if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
-            nlist_ib(vgrid) = nlist_ib(vgrid)+1
-            list_pointer(nlist_ib(vgrid),vgrid) = ilist
-          end if
-        end do
-        ! The list is reordered and stored in a local list
-        allocate(list_ib(6,nlist_ib(ugrid),2))
-        allocate(A_ib   (1,nlist_ib(ugrid),2))
-        do ilist2 = 1,nlist_ib(ugrid)
-          ilist = list_pointer(ilist2,ugrid)
-          list_ib(1,ilist2,ugrid) = list_ib2(1,ilist,ugrid)  ! i
-          list_ib(2,ilist2,ugrid) = list_ib2(2,ilist,ugrid)  ! k
-          list_ib(3,ilist2,ugrid) = list_ib2(3,ilist,ugrid)  ! j
-          list_ib(4,ilist2,ugrid) = list_ib2(4,ilist,ugrid)
-          list_ib(5,ilist2,ugrid) = list_ib2(5,ilist,ugrid)
-          list_ib(6,ilist2,ugrid) = list_ib2(6,ilist,ugrid)
-          A_ib   (1,ilist2,ugrid) = A_ib2   (1,ilist,ugrid)
-        end do
-        do ilist2 = 1,nlist_ib(vgrid)
-          ilist = list_pointer(ilist2,vgrid)
-          list_ib(1,ilist2,vgrid) = list_ib2(1,ilist,vgrid)  ! i
-          list_ib(2,ilist2,vgrid) = list_ib2(2,ilist,vgrid)  ! k
-          list_ib(3,ilist2,vgrid) = list_ib2(3,ilist,vgrid)  ! j
-          list_ib(4,ilist2,vgrid) = list_ib2(4,ilist,vgrid)
-          list_ib(5,ilist2,vgrid) = list_ib2(5,ilist,vgrid)
-          list_ib(6,ilist2,vgrid) = list_ib2(6,ilist,vgrid)
-          A_ib   (1,ilist2,vgrid) = A_ib2   (1,ilist,vgrid)
-        end do
-        deallocate(list_pointer)
-        ! The list with 'imm boundary points you have to handle with' is sent to every proc
-        inputNu(1) = nlist_ib(ugrid)
-        inputNv(1) = nlist_ib(vgrid)
-        do j = 0,np-1
-          inputNu(j+2   ) = nyuIB1(j)
-          inputNu(j+2+np) = nyuIB2(j)
-          inputNv(j+2   ) = nyvIB1(j)
-          inputNv(j+2+np) = nyvIB2(j)
-        end do
-        inputNu(2*np+1+1) = nyu11
-        inputNu(2*np+1+2) = nyu21
-        inputNu(2*np+1+3) = nyu12
-        inputNu(2*np+1+4) = nyu22
-        inputNv(2*np+1+1) = nyv11
-        inputNv(2*np+1+2) = nyv21
-        inputNv(2*np+1+3) = nyv12
-        inputNv(2*np+1+4) = nyv22
-        call MPI_SEND(inputNu,2*np+1+4           ,MPI_INTEGER,iproc,20000+iproc,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(inputNv,2*np+1+4           ,MPI_INTEGER,iproc,24000+iproc,MPI_COMM_WORLD,ierr)
-        ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
-        call MPI_SEND(list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,iproc,21000+iproc,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,iproc,23000+iproc,MPI_COMM_WORLD,ierr)
-        deallocate(list_ib)
-        deallocate(A_ib)
-      end do
+!       ! Prepares the information of the UPPER riblets to be sent to half of the procs
+!       do iproc = np/2,np-1
+!         nlist_ib = 0
+!         allocate(list_pointer(nlist_ib2,2))
+!         ! Checks the points of the imm boundaries that belong to planes of the proc 'iproc'
+!         !  If the point is in one of those planes, it is added to a list
+!         do ilist = 1,nlist_ib2
+!           j = list_ib2(3,ilist,ugrid)
+!           if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
+!             nlist_ib(ugrid) = nlist_ib(ugrid)+1
+!             list_pointer(nlist_ib(ugrid),ugrid) = ilist
+!           end if
+!         end do
+!         do ilist = 1,nlist_ib2
+!           j = list_ib2(3,ilist,vgrid)
+!           if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
+!             nlist_ib(vgrid) = nlist_ib(vgrid)+1
+!             list_pointer(nlist_ib(vgrid),vgrid) = ilist
+!           end if
+!         end do
+!         ! The list is reordered and stored in a local list
+!         allocate(list_ib(6,nlist_ib(ugrid),2))
+!         allocate(A_ib   (1,nlist_ib(ugrid),2))
+!         do ilist2 = 1,nlist_ib(ugrid)
+!           ilist = list_pointer(ilist2,ugrid)
+!           list_ib(1,ilist2,ugrid) = list_ib2(1,ilist,ugrid)  ! i
+!           list_ib(2,ilist2,ugrid) = list_ib2(2,ilist,ugrid)  ! k
+!           list_ib(3,ilist2,ugrid) = list_ib2(3,ilist,ugrid)  ! j
+!           list_ib(4,ilist2,ugrid) = list_ib2(4,ilist,ugrid)
+!           list_ib(5,ilist2,ugrid) = list_ib2(5,ilist,ugrid)
+!           list_ib(6,ilist2,ugrid) = list_ib2(6,ilist,ugrid)
+!           A_ib   (1,ilist2,ugrid) = A_ib2   (1,ilist,ugrid)
+!         end do
+!         do ilist2 = 1,nlist_ib(vgrid)
+!           ilist = list_pointer(ilist2,vgrid)
+!           list_ib(1,ilist2,vgrid) = list_ib2(1,ilist,vgrid)  ! i
+!           list_ib(2,ilist2,vgrid) = list_ib2(2,ilist,vgrid)  ! k
+!           list_ib(3,ilist2,vgrid) = list_ib2(3,ilist,vgrid)  ! j
+!           list_ib(4,ilist2,vgrid) = list_ib2(4,ilist,vgrid)
+!           list_ib(5,ilist2,vgrid) = list_ib2(5,ilist,vgrid)
+!           list_ib(6,ilist2,vgrid) = list_ib2(6,ilist,vgrid)
+!           A_ib   (1,ilist2,vgrid) = A_ib2   (1,ilist,vgrid)
+!         end do
+!         deallocate(list_pointer)
+!         ! The list with 'imm boundary points you have to handle with' is sent to every proc
+!         inputNu(1) = nlist_ib(ugrid)
+!         inputNv(1) = nlist_ib(vgrid)
+!         do j = 0,np-1
+!           inputNu(j+2   ) = nyuIB1(j)
+!           inputNu(j+2+np) = nyuIB2(j)
+!           inputNv(j+2   ) = nyvIB1(j)
+!           inputNv(j+2+np) = nyvIB2(j)
+!         end do
+!         inputNu(2*np+1+1) = nyu11
+!         inputNu(2*np+1+2) = nyu21
+!         inputNu(2*np+1+3) = nyu12
+!         inputNu(2*np+1+4) = nyu22
+!         inputNv(2*np+1+1) = nyv11
+!         inputNv(2*np+1+2) = nyv21
+!         inputNv(2*np+1+3) = nyv12
+!         inputNv(2*np+1+4) = nyv22
+!         call MPI_SEND(inputNu,2*np+1+4           ,MPI_INTEGER,iproc,20000+iproc,MPI_COMM_WORLD,ierr)
+!         call MPI_SEND(inputNv,2*np+1+4           ,MPI_INTEGER,iproc,24000+iproc,MPI_COMM_WORLD,ierr)
+!         ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
+!         call MPI_SEND(list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,iproc,21000+iproc,MPI_COMM_WORLD,ierr)
+!         call MPI_SEND(A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,iproc,23000+iproc,MPI_COMM_WORLD,ierr)
+!         deallocate(list_ib)
+!         deallocate(A_ib)
+!       end do
 
-      ! Prepares the information to be sent to the master proc 
-      iproc = 0
-      nlist_ib = 0
-      allocate(list_pointer(nlist_ib1,2))
-      do ilist = 1,nlist_ib1
-        j = list_ib1(3,ilist,ugrid)
-        if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
-          nlist_ib(ugrid) = nlist_ib(ugrid)+1
-          list_pointer(nlist_ib(ugrid),ugrid) = ilist
-        end if
-      end do
-      do ilist = 1,nlist_ib1
-        j = list_ib1(3,ilist,vgrid)
-        if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
-          nlist_ib(vgrid) = nlist_ib(vgrid)+1
-          list_pointer(nlist_ib(vgrid),vgrid) = ilist
-        end if
-      end do
-      allocate(list_ib(6,nlist_ib(ugrid),2))
-      allocate(A_ib   (1,nlist_ib(ugrid),2))
-      do ilist2 = 1,nlist_ib(ugrid)
-        ilist = list_pointer(ilist2,ugrid)
-        list_ib(1,ilist2,ugrid) = list_ib1(1,ilist,ugrid)  ! i
-        list_ib(2,ilist2,ugrid) = list_ib1(2,ilist,ugrid)  ! k
-        list_ib(3,ilist2,ugrid) = list_ib1(3,ilist,ugrid)  ! j
-        list_ib(4,ilist2,ugrid) = list_ib1(4,ilist,ugrid)
-        list_ib(5,ilist2,ugrid) = list_ib1(5,ilist,ugrid)
-        list_ib(6,ilist2,ugrid) = list_ib1(6,ilist,ugrid)
-        A_ib   (1,ilist2,ugrid) = A_ib1   (1,ilist,ugrid)
-      end do
-      do ilist2 = 1,nlist_ib(vgrid)
-        ilist = list_pointer(ilist2,vgrid)
-        list_ib(1,ilist2,vgrid) = list_ib1(1,ilist,vgrid)  ! i
-        list_ib(2,ilist2,vgrid) = list_ib1(2,ilist,vgrid)  ! k
-        list_ib(3,ilist2,vgrid) = list_ib1(3,ilist,vgrid)  ! j
-        list_ib(4,ilist2,vgrid) = list_ib1(4,ilist,vgrid)
-        list_ib(5,ilist2,vgrid) = list_ib1(5,ilist,vgrid)
-        list_ib(6,ilist2,vgrid) = list_ib1(6,ilist,vgrid)
-        A_ib   (1,ilist2,vgrid) = A_ib1   (1,ilist,vgrid)
-      end do
-      deallocate(list_pointer)
-      deallocate(list_ib1,list_ib2)
-      deallocate(A_ib1,A_ib2)
+!       ! Prepares the information to be sent to the master proc 
+!       iproc = 0
+!       nlist_ib = 0
+!       allocate(list_pointer(nlist_ib1,2))
+!       do ilist = 1,nlist_ib1
+!         j = list_ib1(3,ilist,ugrid)
+!         if (j>=nyuIB1(iproc) .and. j<=nyuIB2(iproc)) then
+!           nlist_ib(ugrid) = nlist_ib(ugrid)+1
+!           list_pointer(nlist_ib(ugrid),ugrid) = ilist
+!         end if
+!       end do
+!       do ilist = 1,nlist_ib1
+!         j = list_ib1(3,ilist,vgrid)
+!         if (j>=nyvIB1(iproc) .and. j<=nyvIB2(iproc)) then
+!           nlist_ib(vgrid) = nlist_ib(vgrid)+1
+!           list_pointer(nlist_ib(vgrid),vgrid) = ilist
+!         end if
+!       end do
+!       allocate(list_ib(6,nlist_ib(ugrid),2))
+!       allocate(A_ib   (1,nlist_ib(ugrid),2))
+!       do ilist2 = 1,nlist_ib(ugrid)
+!         ilist = list_pointer(ilist2,ugrid)
+!         list_ib(1,ilist2,ugrid) = list_ib1(1,ilist,ugrid)  ! i
+!         list_ib(2,ilist2,ugrid) = list_ib1(2,ilist,ugrid)  ! k
+!         list_ib(3,ilist2,ugrid) = list_ib1(3,ilist,ugrid)  ! j
+!         list_ib(4,ilist2,ugrid) = list_ib1(4,ilist,ugrid)
+!         list_ib(5,ilist2,ugrid) = list_ib1(5,ilist,ugrid)
+!         list_ib(6,ilist2,ugrid) = list_ib1(6,ilist,ugrid)
+!         A_ib   (1,ilist2,ugrid) = A_ib1   (1,ilist,ugrid)
+!       end do
+!       do ilist2 = 1,nlist_ib(vgrid)
+!         ilist = list_pointer(ilist2,vgrid)
+!         list_ib(1,ilist2,vgrid) = list_ib1(1,ilist,vgrid)  ! i
+!         list_ib(2,ilist2,vgrid) = list_ib1(2,ilist,vgrid)  ! k
+!         list_ib(3,ilist2,vgrid) = list_ib1(3,ilist,vgrid)  ! j
+!         list_ib(4,ilist2,vgrid) = list_ib1(4,ilist,vgrid)
+!         list_ib(5,ilist2,vgrid) = list_ib1(5,ilist,vgrid)
+!         list_ib(6,ilist2,vgrid) = list_ib1(6,ilist,vgrid)
+!         A_ib   (1,ilist2,vgrid) = A_ib1   (1,ilist,vgrid)
+!       end do
+!       deallocate(list_pointer)
+!       deallocate(list_ib1,list_ib2)
+!       deallocate(A_ib1,A_ib2)
 
-! SLAVES
+! ! SLAVES
 
-    else
-      ! The information is received by every proc
-      call MPI_RECV  (inputNu  ,2*np+1+4   ,MPI_INTEGER,0,20000+myid,MPI_COMM_WORLD,status,ierr)
-      call MPI_RECV  (inputNv  ,2*np+1+4   ,MPI_INTEGER,0,24000+myid,MPI_COMM_WORLD,status,ierr)
-      nlist_ib(ugrid) = inputNu(1)
-      nlist_ib(vgrid) = inputNv(1)
-      do iproc = 0,np-1
-        nyuIB1(iproc) = inputNu(iproc+2   )
-        nyuIB2(iproc) = inputNu(iproc+2+np)
-        nyvIB1(iproc) = inputNv(iproc+2   )
-        nyvIB2(iproc) = inputNv(iproc+2+np)
-      end do
-      nyu11 = inputNu(2*np+1+1)
-      nyu21 = inputNu(2*np+1+2)
-      nyu12 = inputNu(2*np+1+3)
-      nyu22 = inputNu(2*np+1+4)
-      nyv11 = inputNv(2*np+1+1)
-      nyv21 = inputNv(2*np+1+2)
-      nyv12 = inputNv(2*np+1+3)
-      nyv22 = inputNv(2*np+1+4)
-      allocate(list_ib(6,nlist_ib(ugrid),2))
-      allocate(A_ib   (1,nlist_ib(ugrid),2))
-      ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
-      call MPI_RECV  (list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,0,21000+myid,MPI_COMM_WORLD,status,ierr)
-      call MPI_RECV  (A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,0,23000+myid,MPI_COMM_WORLD,status,ierr)
-    end if
-    deallocate(inputNu)
-    deallocate(inputNv)
-  end if
+!     else
+!       ! The information is received by every proc
+!       call MPI_RECV  (inputNu  ,2*np+1+4   ,MPI_INTEGER,0,20000+myid,MPI_COMM_WORLD,status,ierr)
+!       call MPI_RECV  (inputNv  ,2*np+1+4   ,MPI_INTEGER,0,24000+myid,MPI_COMM_WORLD,status,ierr)
+!       nlist_ib(ugrid) = inputNu(1)
+!       nlist_ib(vgrid) = inputNv(1)
+!       do iproc = 0,np-1
+!         nyuIB1(iproc) = inputNu(iproc+2   )
+!         nyuIB2(iproc) = inputNu(iproc+2+np)
+!         nyvIB1(iproc) = inputNv(iproc+2   )
+!         nyvIB2(iproc) = inputNv(iproc+2+np)
+!       end do
+!       nyu11 = inputNu(2*np+1+1)
+!       nyu21 = inputNu(2*np+1+2)
+!       nyu12 = inputNu(2*np+1+3)
+!       nyu22 = inputNu(2*np+1+4)
+!       nyv11 = inputNv(2*np+1+1)
+!       nyv21 = inputNv(2*np+1+2)
+!       nyv12 = inputNv(2*np+1+3)
+!       nyv22 = inputNv(2*np+1+4)
+!       allocate(list_ib(6,nlist_ib(ugrid),2))
+!       allocate(A_ib   (1,nlist_ib(ugrid),2))
+!       ! ATTENTION nlist_ib ugrid and vgrid are equal, otherwise it wont work
+!       call MPI_RECV  (list_ib,6*nlist_ib(ugrid)*2,MPI_INTEGER,0,21000+myid,MPI_COMM_WORLD,status,ierr)
+!       call MPI_RECV  (A_ib   ,1*nlist_ib(ugrid)*2,MPI_REAL8  ,0,23000+myid,MPI_COMM_WORLD,status,ierr)
+!     end if
+!     deallocate(inputNu)
+!     deallocate(inputNv)
+!   end if
  
-end subroutine
+! end subroutine
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!    PROC LIMS COL NEW   !!!!!!!!!!!!!!!
@@ -2398,20 +2399,12 @@ subroutine proc_lims_columns(myid)
   include 'mpif.h'                         
   integer :: ierr,status
 
-  integer :: iblock, iband, iproc, accum, column, i, k, myid
+  integer :: iblock, iproc, accum, column, i, k, myid
   integer :: columns_num_total !columns_num_long, columns_num_short
   integer :: max_columns_num
-  ! integer :: columns_num_short_proc, columns_num_short_proc_rem
-  ! integer :: columns_num_long_proc,  columns_num_long_proc_rem
-  ! integer, allocatable :: columns_short_list_i(:), columns_short_list_k(:)
-  ! integer, allocatable :: columns_long_list_i(:) , columns_long_list_k(:)
-
   integer :: columns_num_total_proc_rem, columns_num_total_proc
   integer, allocatable :: columns_total_list_i(:) , columns_total_list_k(:)
-  
-  integer :: postpointsx,postpointsz,texturepointsx,texturepointsz
-  integer :: ip,kp
-  
+
   write(6,*) '>>> entered proc_lims_columns, myid =', myid
   ! Creating list of columns with x and z coordinates:
   !   columns_i(column_index,iband,myid), columns_k(column_index,iband,myid) and columns_num(iband,myid)
@@ -2613,7 +2606,7 @@ subroutine proc_lims_columns(myid)
   do iproc = 0,np-1
         do column = 1,columns_num(iproc)
           if (columns_k(column,iproc) > N(2,1)/2) then
-            dk_phys(column,iproc) = N(2,1)-N(2,iband)
+            dk_phys(column,iproc) = N(2,1)-N(2,nband)
           end if
     end do
   end do
@@ -3103,8 +3096,14 @@ subroutine proc_lims_planes(myid)
   ! limPL_incw is like planelim but including first and last points that were previously removed.
   !  It is only used in planes_to_modes_UVP, modes_to_planes_UVP, record_out and stats
   limPL_excw = planelim
+
+  limPL_incw = planelim
   limPL_incw(:,1,0   ) = planelim(:,1,0   ) - 1
   limPL_incw(:,2,np-1) = planelim(:,2,np-1) + 1
+
+  ! do i=0, 0
+  !   write(6,*) "limPL_incw", limPL_incw(ugrid,1,myid), limPL_incw(ugrid,2,myid), limPL_excw(ugrid,1,myid), limPL_excw(ugrid,2,myid), myid
+  ! end do 
 
   
 
@@ -3129,6 +3128,8 @@ subroutine proc_lims_planes(myid)
   jgal(vgrid,2) = limPL_excw(vgrid,2,myid)
   jgal(pgrid,1) = limPL_excw(pgrid,1,myid)
   jgal(pgrid,2) = limPL_excw(pgrid,2,myid)
+
+  !write(6,*) "jgal", jgal(vgrid,1), jgal(vgrid,2), myid
 
   if (myid == 0) then
     do iproc = 0, np-1
@@ -3567,7 +3568,7 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     stop
   end if
 
-  write(6,*) "finished init conds"
+  !write(6,*) "check1 ", myid
 
   ! Broadcast the time step and time.
   ! If it's initialized from a previous simulation this value is already known, otherwise it's set to 0
@@ -3578,13 +3579,14 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
   iwrite = iter
 
   ! 'Probably' this is used to initialize the divergence in the case of a new simulation
-  ! write(6,*) "call divergence "
+  ! write(6,*) "call divergence ", myid
   call divergence(div%f,u1%f,u2%f,u3%f,iband,myid)
 
-  ! write(6,*) "call init stats"
+  ! write(6,*) "call init stats", myid
   call init_stats(myid)
+  ! write(6,*) "finished init_stats", myid
   
-  ! write(6,*) "call init_sl stats"
+  !write(6,*) "call init_sl stats", myid
   call init_sl_stats(myid)
 
   if (myid==0) then
@@ -3749,12 +3751,12 @@ subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
 
   call read_in(myid)
    
-  write(6,*) " start pplanes to modes"
+  ! write(6,*) " start pplanes to modes"
   call planes_to_modes_UVP(u1,u1PL,2,myid,status,ierr)
   call planes_to_modes_UVP(u2,u2PL,1,myid,status,ierr)
   call planes_to_modes_UVP(u3,u3PL,2,myid,status,ierr)
   call planes_to_modes_UVP(p ,ppPL,3,myid,status,ierr)
-  write(6,*) " finished pplanes to modes"
+  ! write(6,*) " finished pplanes to modes"
   
   ! Chris' trick
   !Pressure reset
@@ -3770,9 +3772,10 @@ subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
 
 end subroutine
 
+
 subroutine mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!! MBLOCK INI PARABOLIC PROFILE !!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!! MBLOCK INI PARABOLIC PROFILE NEW !!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! TODO Needs to be checked
@@ -3784,7 +3787,7 @@ subroutine mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)
   integer status(MPI_STATUS_SIZE),ierr,myid         ! MPI variables
 
   integer iband
-  type(cfield) u1(sband:eband),u2(sband:eband),u3(sband:eband),p(sband:eband)
+  type(cfield) u1,u2,u3,p
   integer nx,nz
   integer j,j1,j2,ju1,ju2,jv1,jv2,jp1,jp2
   integer, allocatable:: nxxu(:),nzzu(:),nxxv(:),nzzv(:)
@@ -3796,12 +3799,12 @@ subroutine mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)
   u2PL = 0d0
   u3PL = 0d0
   ppPL = 0d0
-  do iband = sband,eband
-    u1(iband)%f = 0d0
-    u2(iband)%f = 0d0
-    u3(iband)%f = 0d0
-    p (iband)%f = 0d0
-  end do
+
+  u1%f = 0d0
+  u2%f = 0d0
+  u3%f = 0d0
+  p %f = 0d0
+
 
   ! Function to create parabolic profile
   allocate(nxxu(N(4,0):N(4,nband)+1),nzzu(N(4,0):N(4,nband)+1))
@@ -3911,6 +3914,148 @@ subroutine mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)
   call planes_to_modes_UVP(p ,ppPL,pgrid,myid,status,ierr)
 
 end subroutine
+
+! subroutine mblock_ini_parabolic_profile(u1,u2,u3,p,myid,status,ierr)
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!! MBLOCK INI PARABOLIC PROFILE !!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+! ! TODO Needs to be checked
+
+!   use declaration
+!   implicit none
+
+!   include 'mpif.h'                                  ! MPI variables
+!   integer status(MPI_STATUS_SIZE),ierr,myid         ! MPI variables
+
+!   integer iband
+!   type(cfield) u1(sband:eband),u2(sband:eband),u3(sband:eband),p(sband:eband)
+!   integer nx,nz
+!   integer j,j1,j2,ju1,ju2,jv1,jv2,jp1,jp2
+!   integer, allocatable:: nxxu(:),nzzu(:),nxxv(:),nzzv(:)
+!   real(8), allocatable:: buffSR(:,:)
+
+!   integer column,i,k
+
+!   u1PL = 0d0
+!   u2PL = 0d0
+!   u3PL = 0d0
+!   ppPL = 0d0
+!   do iband = sband,eband
+!     u1(iband)%f = 0d0
+!     u2(iband)%f = 0d0
+!     u3(iband)%f = 0d0
+!     p (iband)%f = 0d0
+!   end do
+
+!   ! Function to create parabolic profile
+!   allocate(nxxu(N(4,0):N(4,nband)+1),nzzu(N(4,0):N(4,nband)+1))
+!   allocate(nxxv(N(3,0):N(3,nband)+1),nzzv(N(3,0):N(3,nband)+1))
+!   nxxu(N(4,0))=N(1,1)+2
+!   nzzu(N(4,0))=N(2,1)
+!   nxxv(N(3,0))=N(1,1)+2
+!   nzzv(N(3,0))=N(2,1)
+!   do iband=1,nband
+!     do j=N(4,iband-1)+1,N(4,iband)
+!       nxxu(j)=N(1,iband)+2
+!       nzzu(j)=N(2,iband)
+!     end do
+!     do j=N(3,iband-1)+1,N(3,iband)
+!       nxxv(j)=N(1,iband)+2
+!       nzzv(j)=N(2,iband)
+!     end do
+!   end do
+!   nxxv(N(3,nband)+1)=N(1,nband)+2
+!   nzzv(N(3,nband)+1)=N(2,nband)
+!   nxxu(N(4,nband)+1)=N(1,nband)+2
+!   nzzu(N(4,nband)+1)=N(2,nband)
+!   if (myid==0) then
+!    ju1=jgal(2,1)-1
+!    ju2=jgal(2,2)
+!    ju1=max(ju1,N(4,0))
+!   else
+!    ju1=jgal(2,1)
+!    ju2=jgal(2,2)
+!    if (jgal(2,2)==N(4,nband)) then
+!      ju2=jgal(2,2)+1
+!    end if
+!    ju1=max(ju1,N(4,0))
+!    ju2=min(ju2,N(4,nband)+1)
+!   end if
+!   if (myid==0) then
+!    jv1=jgal(1,1)-1
+!    jv2=jgal(1,2)
+!    jv1=max(jv1,N(3,0))
+!   else
+!    jv1=jgal(1,1)
+!    jv2=jgal(1,2)
+!    if (jgal(1,2)==N(3,nband)) then
+!      jv2=jgal(1,2)+1
+!    end if
+!    jv1=max(jv1,N(3,0))
+!    jv2=min(jv2,N(3,nband)+1)
+!   end if
+!   if (myid==0) then
+!    jp1=jgal(3,1)-1
+!    jp2=jgal(3,2)
+!    jp1=max(jp1,N(4,0)+1)
+!   else
+!    jp1=jgal(3,1)
+!    jp2=jgal(3,2)
+!    if (jgal(3,2)==N(4,nband)-1) then
+!      jp2=jgal(3,2)+1
+!    end if
+!    jp1=max(jp1,N(4,0)+1)
+!    jp2=min(jp2,N(4,nband)+1-1)
+!   end if
+!   !!!!!!!!!!!!!!    u1    !!!!!!!!!!!!!!
+!   do j=ju1,ju2
+!     nx=nxxu(j)
+!     nz=nzzu(j)
+!     allocate(buffSR(nx,nz))
+!     buffSR     =0d0
+!     buffSR(1,1)=(0.5d0)*Re*mpgx*(yu(j)**2-1)                    ! Parabolic profile: 1/2*Re*dp/dx*(y^2-1) (Reynolds bulk)
+!     call buff_to_u(u1PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!     deallocate(buffSR)
+!   end do
+!   !!!!!!!!!!!!!!    u2    !!!!!!!!!!!!!!
+!   do j=jv1,jv2
+!     nx=nxxv(j)
+!     nz=nzzv(j)
+!     allocate(buffSR(nx,nz))
+!     buffSR     =0
+!     buffSR(1,1)=1e-6                                          ! Some noise
+!     call buff_to_u(u2PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!     deallocate(buffSR)
+!   end do
+!   !!!!!!!!!!!!!!    u3    !!!!!!!!!!!!!!
+!   do j=ju1,ju2
+!     nx=nxxu(j)
+!     nz=nzzu(j)
+!     allocate(buffSR(nx,nz))
+!     buffSR     =0d0
+!     buffSR(1,1)=1e-5                                          ! Some noise 
+!     call buff_to_u(u3PL(1,1,j),buffSR,nx,nz,igal,kgal)
+!     deallocate(buffSR)
+!   end do
+!   !!!!!!!!!!!!!!    p     !!!!!!!!!!!!!!
+!   do j=jp1,jp2
+!     nx=nxxu(j)
+!     nz=nzzu(j)
+!     allocate(buffSR(nx,nz))
+!     buffSR     =0d0
+!     buffSR(1,1)=1d0                                           ! Some noise 
+!     call buff_to_u(ppPL(1,1,j),buffSR,nx,nz,igal,kgal)
+!     deallocate(buffSR)
+!   end do
+!   deallocate(nxxu,nzzu,nxxv,nzzv)
+
+!   call planes_to_modes_UVP(u1,u1PL,ugrid,myid,status,ierr)
+!   call planes_to_modes_UVP(u2,u2PL,vgrid,myid,status,ierr)
+!   call planes_to_modes_UVP(u3,u3PL,ugrid,myid,status,ierr)
+!   call planes_to_modes_UVP(p ,ppPL,pgrid,myid,status,ierr)
+
+! end subroutine
 
 subroutine read_in(myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -4803,7 +4948,7 @@ subroutine init_stats(myid)
   use declaration
   implicit none
 
-  integer ju1,ju2,jv1,jv2,jp1,jp2,myid
+  integer ju1,ju2,jv1,jv2,jp1,jp2,myid, i 
 
   allocate(Um (limPL_incw(ugrid,1,myid):limPL_incw(ugrid,2,myid)),U2m (limPL_incw(ugrid,1,myid):limPL_incw(ugrid,2,myid)))
   allocate(Vm (limPL_incw(vgrid,1,myid):limPL_incw(vgrid,2,myid)),V2m (limPL_incw(vgrid,1,myid):limPL_incw(vgrid,2,myid)))
@@ -4813,64 +4958,48 @@ subroutine init_stats(myid)
   allocate(UVm(limPL_incw(ugrid,1,myid):limPL_incw(ugrid,2,myid)))
   allocate(UWm(limPL_incw(ugrid,1,myid):limPL_incw(ugrid,2,myid)))
   allocate(VWm(limPL_incw(vgrid,1,myid):limPL_incw(vgrid,2,myid)))
-  
-  if (bandPL(myid)==1) then
-    ju1 = limPL_incw(ugrid,1,myid)-N(4,0)
-    ju2 = limPL_incw(ugrid,2,myid)-N(4,0)
-    jv1 = limPL_incw(vgrid,1,myid)-N(3,0)
-    jv2 = limPL_incw(vgrid,2,myid)-N(3,0)
-    jp1 = limPL_incw(pgrid,1,myid)-(N(4,0)+1)
-    jp2 = limPL_incw(pgrid,2,myid)-(N(4,0)+1)
-    allocate(UmC (dnx,dnz,ju1:ju2),U2mC (dnx,dnz,ju1:ju2))
-    allocate(VmC (dnx,dnz,jv1:jv2),V2mC (dnx,dnz,jv1:jv2))
-    allocate(WmC (dnx,dnz,ju1:ju2),W2mC (dnx,dnz,ju1:ju2))
-    allocate(PmC (dnx,dnz,jp1:jp2),P2mC (dnx,dnz,jp1:jp2))
-    allocate(wxmC(dnx,dnz,jv1:jv2),wx2mC(dnx,dnz,jv1:jv2))
-    allocate(UVmC(dnx,dnz,ju1:ju2))
-    allocate(UWmC(dnx,dnz,ju1:ju2))
-    allocate(VWmC(dnx,dnz,jv1:jv2))  
-    UmC   = 0d0
-    U2mC  = 0d0
-    VmC   = 0d0
-    V2mC  = 0d0
-    WmC   = 0d0
-    W2mC  = 0d0
-    PmC   = 0d0
-    P2mC  = 0d0
-    UVmC  = 0d0
-    UWmC  = 0d0
-    VWmC  = 0d0
-    wxmC  = 0d0
-    wx2mC = 0d0
-  else if (bandPL(myid)==nband) then
-    ju1 = -limPL_incw(ugrid,2,myid)+N(4,nband)+1
-    ju2 = -limPL_incw(ugrid,1,myid)+N(4,nband)+1
-    jv1 = -limPL_incw(vgrid,2,myid)+N(3,nband)+1
-    jv2 = -limPL_incw(vgrid,1,myid)+N(3,nband)+1
-    jp1 = -limPL_incw(pgrid,2,myid)+N(4,nband)
-    jp2 = -limPL_incw(pgrid,1,myid)+N(4,nband)
-    allocate(UmC (dnx,dnz,ju1:ju2),U2mC (dnx,dnz,ju1:ju2))
-    allocate(VmC (dnx,dnz,jv1:jv2),V2mC (dnx,dnz,jv1:jv2))
-    allocate(WmC (dnx,dnz,ju1:ju2),W2mC (dnx,dnz,ju1:ju2))
-    allocate(PmC (dnx,dnz,jp1:jp2),P2mC (dnx,dnz,jp1:jp2))
-    allocate(wxmC(dnx,dnz,jv1:jv2),wx2mC(dnx,dnz,jv1:jv2))
-    allocate(UVmC(dnx,dnz,ju1:ju2))
-    allocate(UWmC(dnx,dnz,ju1:ju2))
-    allocate(VWmC(dnx,dnz,jv1:jv2))
-    UmC   = 0d0
-    U2mC  = 0d0
-    VmC   = 0d0
-    V2mC  = 0d0
-    WmC   = 0d0
-    W2mC  = 0d0
-    PmC   = 0d0
-    P2mC  = 0d0
-    UVmC  = 0d0
-    UWmC  = 0d0
-    VWmC  = 0d0
-    wxmC  = 0d0
-    wx2mC = 0d0
-  end if
+
+  ju1 = -limPL_incw(ugrid,2,myid)+N(4,nband)+1
+  ju2 = -limPL_incw(ugrid,1,myid)+N(4,nband)+1
+  jv1 = -limPL_incw(vgrid,2,myid)+N(3,nband)+1
+  jv2 = -limPL_incw(vgrid,1,myid)+N(3,nband)+1
+  jp1 = -limPL_incw(pgrid,2,myid)+N(4,nband)
+  jp2 = -limPL_incw(pgrid,1,myid)+N(4,nband)
+
+  ! write(6,*) "defined j's", myid
+  allocate(UmC (dnx,dnz,ju1:ju2),U2mC (dnx,dnz,ju1:ju2))
+  allocate(VmC (dnx,dnz,jv1:jv2),V2mC (dnx,dnz,jv1:jv2))
+  allocate(WmC (dnx,dnz,ju1:ju2),W2mC (dnx,dnz,ju1:ju2))
+  allocate(PmC (dnx,dnz,jp1:jp2),P2mC (dnx,dnz,jp1:jp2))
+  allocate(wxmC(dnx,dnz,jv1:jv2),wx2mC(dnx,dnz,jv1:jv2))
+  allocate(UVmC(dnx,dnz,ju1:ju2))
+  allocate(UWmC(dnx,dnz,ju1:ju2))
+  allocate(VWmC(dnx,dnz,jv1:jv2))
+  ! write(6,*) "finished allocating", myid
+
+  ! write(6,*) "init_stats: myid=", myid
+  ! write(6,*) "  Um:  lb=", lbound(Um,1),  " ub=", ubound(Um,1),  " size=", size(Um)
+  ! write(6,*) "  Vm:  lb=", lbound(Vm,1),  " ub=", ubound(Vm,1),  " size=", size(Vm)
+  ! write(6,*) "  Pm:  lb=", lbound(Pm,1),  " ub=", ubound(Pm,1),  " size=", size(Pm)
+  ! write(6,*) "  UmC: lb3=", lbound(UmC,3), " ub3=", ubound(UmC,3), " size=", size(UmC)
+  ! call flush(6)
+
+
+  UmC   = 0d0
+  U2mC  = 0d0
+  VmC   = 0d0
+  V2mC  = 0d0
+  WmC   = 0d0
+  W2mC  = 0d0
+  PmC   = 0d0
+  P2mC  = 0d0
+  UVmC  = 0d0
+  UWmC  = 0d0
+  VWmC  = 0d0
+  wxmC  = 0d0
+  wx2mC = 0d0
+
+  !write(6,*) "finished if statement", myid
 
   Um    = 0d0
   U2m   = 0d0
@@ -4886,6 +5015,9 @@ subroutine init_stats(myid)
   wxm   = 0d0
   wx2m  = 0d0
   istat = 0
+
+  write(6,*) "finished setting to 0", myid
+  
 
  if (myid==0) then
    write(ext4,'(i5.5)') int(t)
@@ -4929,7 +5061,7 @@ subroutine nonlinRead
   allocate(nonlin(jlow:jupp,9))
 
   if (allocated(weight)) deallocate(weight)
-  allocate(weight(jlow:jupp))
+  allocate(weight(jlow:jupp+1))
   weight(jlow:jupp) = 0   ! initialise
 
 

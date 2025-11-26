@@ -178,7 +178,7 @@ nstatsl = nwrite
 
   ! Get the initial conditions
   call getini(u1,u2,u3,p,div,myid,status,ierr)
-  write(*,*) 'finished getini'
+  write(*,*) 'finished getini', myid
 
 nextqt = floor(t*10d0)/10d0+0.1d0
 !write(*,*) 'nextqt'
@@ -468,6 +468,7 @@ subroutine laplacian_U(Lu,u,iband,myid)
   complex(8) Lu(jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
   complex(8)  u(jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
   real(8) k2x,k2z
+
 
   do column = 1,columns_num(myid)
     i = columns_i(column,myid)
