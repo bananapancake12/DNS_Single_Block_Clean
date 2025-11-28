@@ -2587,7 +2587,7 @@ subroutine proc_lims_columns(myid)
         do column = 1,columns_num(iproc)
           if (columns_k(column,iproc) > N(2,nband)/2) then
             dk(column,iproc) = N(2,nband)-Ngal(2,nband)
-            !write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
+            write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
           end if
     end do
   end do
@@ -3102,7 +3102,9 @@ subroutine proc_lims_planes(myid)
   limPL_incw(:,2,np-1) = planelim(:,2,np-1) + 1
 
   ! do i=0, 0
-  !   write(6,*) "limPL_incw", limPL_incw(ugrid,1,myid), limPL_incw(ugrid,2,myid), limPL_excw(ugrid,1,myid), limPL_excw(ugrid,2,myid), myid
+
+  !     write(6,*) "limPL_incw", limPL_incw(pgrid,1,myid), limPL_incw(pgrid,2,myid), myid 
+
   ! end do 
 
   
@@ -5016,7 +5018,7 @@ subroutine init_stats(myid)
   wx2m  = 0d0
   istat = 0
 
-  write(6,*) "finished setting to 0", myid
+  !write(6,*) "finished setting to 0", myid
   
 
  if (myid==0) then

@@ -149,19 +149,6 @@ nstatsl = nwrite
   allocate( psi%f( jlim(1,pgrid)      : jlim(2,pgrid),      columns_num(myid) ) )
   allocate( div%f( jlim(1,pgrid)      : jlim(2,pgrid),      columns_num(myid) ) )
 
-    ! u1  (iband)%f = 0d0
-    ! u2  (iband)%f = 0d0
-    ! u3  (iband)%f = 0d0
-    ! du1  (iband)%f = 0d0
-    ! du2  (iband)%f = 0d0
-    ! du3  (iband)%f = 0d0
-    ! Nu1  (iband)%f = 0d0
-    ! Nu2  (iband)%f = 0d0
-    ! Nu3  (iband)%f = 0d0
-    ! p   (iband)%f = 0d0
-    ! psi (iband)%f = 0d0
-    ! div (iband)%f = 0d0
-
   u1%f  = 0d0
   u2%f  = 0d0
   u3%f  = 0d0
@@ -178,7 +165,7 @@ nstatsl = nwrite
 
   ! Get the initial conditions
   call getini(u1,u2,u3,p,div,myid,status,ierr)
-  write(*,*) 'finished getini', myid
+  ! write(*,*) 'finished getini', myid
 
 nextqt = floor(t*10d0)/10d0+0.1d0
 !write(*,*) 'nextqt'
@@ -199,7 +186,11 @@ nextqt = floor(t*10d0)/10d0+0.1d0
       call RHS0_u1(du1,u1,Nu1,p,myid)
       call RHS0_u2(du2,u2,Nu2,p,myid)
       call RHS0_u3(du3,u3,Nu3,p,myid)
-      
+
+      if(myid==0) then
+        write(6,*) "finished RHS =====> Building Nonlinear"
+      end if 
+
       ! Build non-linear terms of right-hand-side of Navier-Stokes equation
       call nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
       ! Resolve the matricial system
@@ -449,9 +440,9 @@ subroutine divergence(div,u1,u2,u3,iband,myid)
 end subroutine
 
 
-subroutine laplacian_U(Lu,u,iband,myid)
+subroutine laplacian_U(Lu,u,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!    LAPLACIAN   !!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!    LAPLACIAN NEW CHECKED   !!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! Second-order Central Difference Scheme laplacian using 
@@ -480,13 +471,25 @@ subroutine laplacian_U(Lu,u,iband,myid)
 &                  +(k2x+k2z+dyu2i(2,j))*u(j  ,column) &
 &                  +         dyu2i(3,j) *u(j+1,column)
     end do
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'Lu complex, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) real(Lu(j,1)), aimag(Lu(j,1))
+    !   end do
+    ! end if
+
+
   end do
+
+
+
 
 end subroutine
 
-subroutine laplacian_V(Lu,u,iband,myid)
+subroutine laplacian_V(Lu,u,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!    LAPLACIAN   !!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!    LAPLACIAN  NEW CHECKED  !!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! Second-order Central Difference Scheme laplacian using 
@@ -514,6 +517,14 @@ subroutine laplacian_V(Lu,u,iband,myid)
 &                  +(k2x+k2z+dyv2i(2,j))*u(j  ,column) &
 &                  +         dyv2i(3,j) *u(j+1,column)
     end do
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'Lu complex, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) real(Lu(j,1)), aimag(Lu(j,1))
+    !   end do
+    ! end if
+
   end do
 
 end subroutine
@@ -808,16 +819,16 @@ end subroutine
 
 subroutine RHS0_u1(du1,u1,Nu1,p,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!     RHS U1     !!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!   RHS U1 NEW CHECKED  but not the mean p grad bit !!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use declaration
   implicit none
-  integer i,k,j,iband,column,myid
-  type(cfield)  u1(sband:eband)
-  type(cfield) du1(sband:eband)
-  type(cfield) Nu1(sband:eband)
-  type(cfield)   p(sband:eband)
+  integer i,k,j,column,myid
+  type(cfield)  u1
+  type(cfield) du1
+  type(cfield) Nu1
+  type(cfield)   p
   real(8) C1,C2
   complex(8) C3
 
@@ -825,18 +836,28 @@ subroutine RHS0_u1(du1,u1,Nu1,p,myid)
   C1 = aRK(kRK)/Re !For solving for u
   C2 = -cRK(kRK)
 
-  do iband = sband,eband
-    call laplacian_U(du1(iband)%f,u1(iband)%f,iband,myid)
-    do column = 1,columns_num(myid)
-      i = columns_i(column,myid)
-      C3 = -dRK(kRK)*k1F_x(i)
-      do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-        du1(iband)%f(j,column) = C1*du1(iband)%f(j,column) &
-&                              + C2*Nu1(iband)%f(j,column) &
-&                              + C3* p (iband)%f(j,column)
-      end do
+  ! write(6,*) "C1", C1, "C2", C2, myid
+
+
+  call laplacian_U(du1%f,u1%f,myid)
+  do column = 1,columns_num(myid)
+    i = columns_i(column,myid)
+    C3 = -dRK(kRK)*k1F_x(i)
+    do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+      du1%f(j,column) = C1*du1%f(j,column) &
+&                              + C2*Nu1%f(j,column) &
+&                              + C3* p %f(j,column)
     end do
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'du1, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) real(du1%f(j,column)), aimag(du1%f(j,column))
+    !   end do
+    ! end if
+    
   end do
+
 
   !Apply mean pressure gradient int x
   ! mode (0,1)
@@ -845,7 +866,7 @@ subroutine RHS0_u1(du1,u1,Nu1,p,myid)
     C1 = -dRK(kRK)*mpgx
     do j=N(4,0)+1,N(4,nband)
     !do j=1,nn+1              !       In case you want not to apply pressure gradient in the immersed boundary
-      du1(midband)%f(j,1) = du1(midband)%f(j,1) + C1
+      du1%f(j,1) = du1%f(j,1) + C1        ! check why they had midband here 
     end do
   end if
 
@@ -860,28 +881,48 @@ subroutine RHS0_u2(du2,u2,Nu2,p,myid)
   use declaration
   implicit none
   integer i,k,j,iband,column,myid
-  type(cfield)  u2(sband:eband)
-  type(cfield) du2(sband:eband)
-  type(cfield) Nu2(sband:eband)
-  type(cfield)   p(sband:eband)
+  type(cfield)  u2
+  type(cfield) du2
+  type(cfield) Nu2
+  type(cfield)   p
   real(8) C1,C2,C3
 
   !C1 = (aRK(kRK)+bRK(kRK))/Re !For solving for du
   C1 = aRK(kRK)/Re !For solving for u
   C2 = -cRK(kRK)
 
-  do iband = sband,eband
-    call laplacian_V(du2(iband)%f,u2(iband)%f,iband,myid)
-    do column = 1,columns_num(myid)
-      do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
-        C3 = -dRK(kRK)*ddthetavi*dthdyv(j)
-        du2(iband)%f(j,column) = C1* du2(iband)%f(j  ,column) &
-&                              + C2* Nu2(iband)%f(j  ,column) &
-&                              + C3*( p (iband)%f(j+1,column) & ! centeres to faces --> (j+1)-(j)
-&                                    -p (iband)%f(j,  column))
-      end do
+  ! write(6,*) "C1", C1, "C2", C2, myid
+
+  ! do iband = sband,eband
+  call laplacian_V(du2%f,u2%f,myid)
+  do column = 1,columns_num(myid)
+    do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
+      C3 = -dRK(kRK)*ddthetavi*dthdyv(j)
+      du2%f(j,column) = C1* du2%f(j  ,column) &
+&                              + C2* Nu2%f(j  ,column) &
+&                              + C3*( p %f(j+1,column) & ! centeres to faces --> (j+1)-(j)
+&                                    -p %f(j,  column))
     end do
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'du1, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) real(du2%f(j,column)), aimag(du2%f(j,column))
+    !   end do
+      
+    ! end if
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'du1, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) 'nu2, p and p '
+    !     write(6,*) Nu2%f(j  ,column), p%f(j+1,column),  -p%f(j,  column)
+    !   end do
+
+    ! end if
+
   end do
+  ! end do
   
 end subroutine
 
@@ -893,10 +934,10 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
   use declaration
   implicit none
   integer i,k,j,iband,column,myid
-  type(cfield)  u3(sband:eband)
-  type(cfield) du3(sband:eband)
-  type(cfield) Nu3(sband:eband)
-  type(cfield)   p(sband:eband)
+  type(cfield)  u3
+  type(cfield) du3
+  type(cfield) Nu3
+  type(cfield)   p
   real(8) C1,C2
   complex(8) C3
 
@@ -904,18 +945,26 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
   C1 = aRK(kRK)/Re !For solving for u
   C2 = -cRK(kRK)
 
-  do iband = sband,eband
-    call laplacian_U(du3(iband)%f,u3(iband)%f,iband,myid)
-    do column = 1,columns_num(myid)
-      k = columns_k(column,myid)
-      C3 = -dRK(kRK)*k1F_z(k)
-      do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-        du3(iband)%f(j,column) = C1*du3(iband)%f(j,column) &
-&                              + C2*Nu3(iband)%f(j,column) &
-&                              + C3* p (iband)%f(j,column)
-      end do
+  ! do iband = sband,eband
+  call laplacian_U(du3%f,u3%f,myid)
+  do column = 1,columns_num(myid)
+    k = columns_k(column,myid)
+    C3 = -dRK(kRK)*k1F_z(k)
+    do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+      du3%f(j,column) = C1*du3%f(j,column) &
+&                              + C2*Nu3%f(j,column) &
+&                              + C3* p %f(j,column)
     end do
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'du3, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) real(du3%f(j,column)), aimag(du3%f(j,column))
+    !   end do
+    ! end if
+    
   end do
+  ! end do
 
 end subroutine
 
