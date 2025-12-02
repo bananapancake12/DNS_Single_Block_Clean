@@ -764,9 +764,9 @@ end if
   ! write(6,*) "finished LU_buildP"
   
   
-  !  allocate(du1PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
-  !  allocate(du2PL(igal,kgal,nyvIB1(myid):nyvIB2(myid)))
-  !  allocate(du3PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
+  ! allocate(du1PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
+  ! allocate(du2PL(igal,kgal,nyvIB1(myid):nyvIB2(myid)))
+  ! allocate(du3PL(igal,kgal,nyuIB1(myid):nyuIB2(myid)))
 
   !allocate(   wx(igal,kgal,jgal(vgrid,1)-1  :jgal(vgrid,2)+1  ))
   allocate(   wx(N(1,bandPL(myid))+2,N(2,bandPL(myid)),jgal(vgrid,1)-1  :jgal(vgrid,2)+1  ))
@@ -3145,46 +3145,45 @@ subroutine proc_lims_planes(myid)
   
 
   
-  !For FFT planes
+  ! For FFT planes
 
 
-  !!! COPIED FROM OLD CODE - IDK WHY WE HAVE THIS OR WHAT IT IS 
-  !Bottom band
-  ! proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid,2)+1)/(np/2))
-  ! rem_planes = (physlim_bot-jlim(1,ugrid,2)+1)-(np/2)*proc_planes
-  ! iplanes = jlim(1,ugrid,2)-1
+  !! COPIED FROM OLD CODE - IDK WHY WE HAVE THIS OR WHAT IT IS 
+  ! Bottom band
+  proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid)+1)/(np/2))
+  rem_planes = (physlim_bot-jlim(1,ugrid)+1)-(np/2)*proc_planes
+  iplanes = jlim(1,ugrid)-1
 
-  !   do iproc = 0,np/2-1
-  !     limPL_FFT(:,1,iproc) = iplanes + 1
+    do iproc = 0,np/2-1
+      limPL_FFT(:,1,iproc) = iplanes + 1
       
-  !     if(iproc<rem_planes)then
-  !       iplanes = iplanes + proc_planes + 1
-  !     else
-  !       iplanes = iplanes + proc_planes
-  !     endif
-  !     limPL_FFT(:,2,iproc) = iplanes
-  !     bandPL_FFT(iproc)=1
+      if(iproc<rem_planes)then
+        iplanes = iplanes + proc_planes + 1
+      else
+        iplanes = iplanes + proc_planes
+      endif
+      limPL_FFT(:,2,iproc) = iplanes
+      bandPL_FFT(iproc)=1
+    enddo
 
-  !   enddo
+  !Top band
+  proc_planes = floor(1d0*(jlim(2,ugrid)-physlim_top+1)/(np/2))
+  rem_planes = (jlim(2,ugrid)-physlim_top+1)-(np/2)*proc_planes
+  iplanes = physlim_top-1
 
-  ! !Top band
-  ! proc_planes = floor(1d0*(jlim(2,ugrid,2)-physlim_top+1)/(np/2))
-  ! rem_planes = (jlim(2,ugrid,2)-physlim_top+1)-(np/2)*proc_planes
-  ! iplanes = physlim_top-1
-
-  !   do iproc = np/2,np-1
-  !     limPL_FFT(:,1,iproc) = iplanes + 1
+    do iproc = np/2,np-1
+      limPL_FFT(:,1,iproc) = iplanes + 1
       
-  !     if(iproc-np/2<rem_planes)then
-  !       iplanes = iplanes + proc_planes + 1
-  !     else
-  !       iplanes = iplanes + proc_planes
-  !     endif
-  !     limPL_FFT(:,2,iproc) = iplanes
-  !     bandPL_FFT(iproc)=3
-  !   enddo
+      if(iproc-np/2<rem_planes)then
+        iplanes = iplanes + proc_planes + 1
+      else
+        iplanes = iplanes + proc_planes
+      endif
+      limPL_FFT(:,2,iproc) = iplanes
+      bandPL_FFT(iproc)=3
+    enddo
     
-  !   limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
+    limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
 
 
 
@@ -3583,7 +3582,7 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
 
   ! 'Probably' this is used to initialize the divergence in the case of a new simulation
   ! write(6,*) "call divergence ", myid
-  call divergence(div%f,u1%f,u2%f,u3%f,iband,myid)
+  call divergence(div%f,u1%f,u2%f,u3%f,myid)
 
   ! write(6,*) "call init stats", myid
   call init_stats(myid)

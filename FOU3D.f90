@@ -110,9 +110,9 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   Nu1PL = 0d0
   Nu2PL = 0d0
   Nu3PL = 0d0
-  du1PL = 0d0
-  du2PL = 0d0
-  du3PL = 0d0
+  ! du1PL = 0d0
+  ! du2PL = 0d0
+  ! du3PL = 0d0
 
 
   if(myid==0) then
@@ -275,9 +275,9 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
 
   !C! Calculate y derrivatives
    ! do iband = sband,eband
-    call der_yu_h(Nu1_dy%f,uv_f%f,iband,myid)
-    call der_yv_h(Nu2_dy%f,vv_c%f,iband,myid)
-    call der_yu_h(Nu3_dy%f,wv_f%f,iband,myid)
+    call der_yu_h(Nu1_dy%f,uv_f%f,myid)
+    call der_yv_h(Nu2_dy%f,vv_c%f,myid)
+    call der_yu_h(Nu3_dy%f,wv_f%f,myid)
   
   !C! Calculate final advective term
     do column = 1,columns_num(myid)
@@ -299,11 +299,20 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   !!!!!!!!!!!  CFL and stats: !!!!!!!!!!!
   if (kRK==1) then
   ! Calculating timestep
-    call dtc_calc(u1PL,u2PL,u3PL,bandPL(myid),myid)
+    call dtc_calc(u1PL,u2PL,u3PL,myid)
     call MPI_ALLREDUCE(dt,dtc,1,MPI_REAL8,MPI_MIN,MPI_COMM_WORLD,ierr)
+
+    ! write(6,*) " Finished MPI reduce =====> dt and dti"
+
     dt  = min(2.5d0*dtv,CFL*dtc)
+    ! write(6,*) "dt"
+
     dti = 1d0/dt
+    ! write(6,*) "dti"
+
     t   = t+dt
+    ! write(6,*) "t+dt"
+
     ! Calculating and writing stats and spectra
     if (flagst==1) then
 
@@ -313,7 +322,7 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
     
     !C! Calculate Omega_x
     u2PLN=0d0
-    call modes_to_planes_phys (u2PLN,u2,vgrid,myid,bandPL(myid),status,ierr)    
+    call modes_to_planes_phys (u2PLN,u2,vgrid,myid,status,ierr)    
     
     do j = limPL_incw(vgrid,1,myid),limPL_incw(vgrid,2,myid)
       call der_z_N(u2PLN(1,1,j),wx(:,:,j),k1F_z) !C! u2PL in Fourier space
@@ -324,19 +333,19 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
 
 
     end do
-    do iband = sband,eband
-      call der_yv_h_wx(du3dy_columns%f,u3%f,iband,myid)
-    end do
+    !do iband = sband,eband
+    call der_yv_h_wx(du3dy_columns%f,u3%f,myid)
+    ! end do
 
-    call modes_to_planes_phys(du3dy_planes,du3dy_columns,vgrid,myid,bandPL(myid),status,ierr)
+    call modes_to_planes_phys(du3dy_planes,du3dy_columns,vgrid,myid,status,ierr)
     
     do j = limPL_incw(vgrid,1,myid),limPL_incw(vgrid,2,myid)
-      do i = 1,N(1,bandPL(myid))+2
-        do k = 1,N(2,bandPL(myid))
+      do i = 1,N(1,nband)+2
+        do k = 1,N(2,nband)
           wx(i,k,j) = -wx(i,k,j)+du3dy_planes(i,k,j) !omega_x at faces!
         end do
       end do
-      call four_to_phys_N(wx(1,1,j),bandPL(myid))
+      call four_to_phys_N(wx(1,1,j))
     end do
 
     
@@ -631,7 +640,7 @@ subroutine der_z_N(u,dudz,kz)
 
 end subroutine
 
-subroutine der_yu_h(dudy,u,iband,myid)
+subroutine der_yu_h(dudy,u,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      DER Y     !!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      f-->c     !!!!!!!!!!!!!!!!!!!!!!!
@@ -640,7 +649,7 @@ subroutine der_yu_h(dudy,u,iband,myid)
   use declaration
   implicit none
 
-  integer j,column,iband,myid
+  integer j,column,myid
   complex(8)  u   (jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid))
   complex(8) dudy (jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(myid))
 
@@ -652,7 +661,7 @@ subroutine der_yu_h(dudy,u,iband,myid)
 
 end subroutine
 
-subroutine der_yv_h(dudy,u,iband,myid)
+subroutine der_yv_h(dudy,u,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      DER Y     !!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      c-->f     !!!!!!!!!!!!!!!!!!!!!!!
@@ -661,7 +670,7 @@ subroutine der_yv_h(dudy,u,iband,myid)
   use declaration
   implicit none
 
-  integer j,column,iband,myid
+  integer j,column,myid
   complex(8)  u   (jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(myid))
   complex(8) dudy (jlim(1,vgrid)+1:jlim(2,vgrid)-1,columns_num(myid))
 
@@ -673,7 +682,7 @@ subroutine der_yv_h(dudy,u,iband,myid)
 
 end subroutine
 
-subroutine der_yv_h_wx(dudy,u,iband,myid)
+subroutine der_yv_h_wx(dudy,u,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      DER Y     !!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!      c-->f     !!!!!!!!!!!!!!!!!!!!!!!
@@ -682,7 +691,7 @@ subroutine der_yv_h_wx(dudy,u,iband,myid)
   use declaration
   implicit none
 
-  integer j,column,iband,myid
+  integer j,column,myid
   complex(8)  u   (jlim(1,ugrid):jlim(2,ugrid),columns_num(myid))
   complex(8) dudy (jlim(1,vgrid):jlim(2,vgrid),columns_num(myid))
 
@@ -694,14 +703,14 @@ subroutine der_yv_h_wx(dudy,u,iband,myid)
 
 end subroutine
 
-subroutine dtc_calc(u1,u2,u3,iband,myid)
+subroutine dtc_calc(u1,u2,u3,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!       CFL      !!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   use declaration
   implicit none
-  integer i,k,j,iband,myid
+  integer i,k,j,myid
   real(8) u1mloc,u2mloc,u3mloc
   real(8) u1(igal,kgal,jgal(2,1):jgal(2,2))
   real(8) u2(igal,kgal,jgal(1,1):jgal(1,2))
@@ -720,17 +729,18 @@ subroutine dtc_calc(u1,u2,u3,iband,myid)
 
   u3mloc = maxval(abs(u3))
   
-  dt = min(1d0/(alp*(N(1,iband)/2)*u1mloc),1d0/(bet*(N(2,iband)/2)*u3mloc),1d0/(u2mloc*dthetavi))
+  dt = min(1d0/(alp*(N(1,nband)/2)*u1mloc),1d0/(bet*(N(2,nband)/2)*u3mloc),1d0/(u2mloc*dthetavi))
 
   ! write(6,*) "u1max", u1mloc
   ! write(6,*) "u2max", u2mloc
   ! write(6,*) "u3max", u3mloc
 
-  write(6,*) "cfl u1", 1d0/(alp*(N(1,iband)/2)*u1mloc)
+  write(6,*) "cfl u1", 1d0/(alp*(N(1,nband)/2)*u1mloc), myid
+  ! write(6,*) "=====> finished DTC calc"
 
 end subroutine
 
-subroutine four_to_phys_u(u1,u2,u3,iband)
+subroutine four_to_phys_u(u1,u2,u3)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!      FOUR TO PHYS     !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -740,25 +750,25 @@ subroutine four_to_phys_u(u1,u2,u3,iband)
 
   use declaration
   implicit none
-  integer iband
-  real(8) u1 (Ngal(1,iband)+2,Ngal(2,iband))
-  real(8) u2 (Ngal(1,iband)+2,Ngal(2,iband))
-  real(8) u3 (Ngal(1,iband)+2,Ngal(2,iband))
+  ! integer iband
+  real(8) u1 (Ngal(1,nband)+2,Ngal(2,nband))
+  real(8) u2 (Ngal(1,nband)+2,Ngal(2,nband))
+  real(8) u3 (Ngal(1,nband)+2,Ngal(2,nband))
   
-  u1(:,Ngal(2,iband)/2+1)=0d0
-  u2(:,Ngal(2,iband)/2+1)=0d0
-  u3(:,Ngal(2,iband)/2+1)=0d0
+  u1(:,Ngal(2,nband)/2+1)=0d0
+  u2(:,Ngal(2,nband)/2+1)=0d0
+  u3(:,Ngal(2,nband)/2+1)=0d0
   
-  call cft(u1,Ngal(1,iband)+2,2,(N(1,iband)+2)/2,1,buffCal_z%b)
-  call rft(u1,Ngal(1,iband)+2,Ngal(2,iband),1,buffRal_x%b)
-  call cft(u2,Ngal(1,iband)+2,2,(N(1,iband)+2)/2,1,buffCal_z%b)
-  call rft(u2,Ngal(1,iband)+2,Ngal(2,iband),1,buffRal_x%b)
-  call cft(u3,Ngal(1,iband)+2,2,(N(1,iband)+2)/2,1,buffCal_z%b)
-  call rft(u3,Ngal(1,iband)+2,Ngal(2,iband),1,buffRal_x%b)
+  call cft(u1,Ngal(1,nband)+2,2,(N(1,nband)+2)/2,1,buffCal_z%b)
+  call rft(u1,Ngal(1,nband)+2,Ngal(2,nband),1,buffRal_x%b)
+  call cft(u2,Ngal(1,nband)+2,2,(N(1,nband)+2)/2,1,buffCal_z%b)
+  call rft(u2,Ngal(1,nband)+2,Ngal(2,nband),1,buffRal_x%b)
+  call cft(u3,Ngal(1,nband)+2,2,(N(1,nband)+2)/2,1,buffCal_z%b)
+  call rft(u3,Ngal(1,nband)+2,Ngal(2,nband),1,buffRal_x%b)
   
 end subroutine
 
-subroutine four_to_phys_du(du,iband)
+subroutine four_to_phys_du(du)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!      FOUR TO PHYS     !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -768,17 +778,17 @@ subroutine four_to_phys_du(du,iband)
 
   use declaration
   implicit none
-  integer iband
-  real(8) du  (Ngal(1,iband)+2,Ngal(2,iband))
+  ! integer iband
+  real(8) du  (Ngal(1,nband)+2,Ngal(2,nband))
 
-  du(:,Ngal(2,iband)/2+1)=0d0
+  du(:,Ngal(2,nband)/2+1)=0d0
   
-  call cft(du   ,Ngal(1,iband)+2,2,(N(1,iband)+2)/2,1,buffCal_z%b)
-  call rft(du   ,Ngal(1,iband)+2,Ngal(2,iband),1,buffRal_x%b)
+  call cft(du   ,Ngal(1,nband)+2,2,(N(1,nband)+2)/2,1,buffCal_z%b)
+  call rft(du   ,Ngal(1,nband)+2,Ngal(2,nband),1,buffRal_x%b)
 
 end subroutine
 
-subroutine four_to_phys_N(du,iband)
+subroutine four_to_phys_N(du)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!      FOUR TO PHYS     !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -788,13 +798,13 @@ subroutine four_to_phys_N(du,iband)
 
   use declaration
   implicit none
-  integer iband
-  real(8) du  (N(1,iband)+2,N(2,iband))
+  ! integer iband
+  real(8) du  (N(1,nband)+2,N(2,nband))
 
   !du(:,N(2,iband)/2+1)=0d0
   
-  call cft(du   ,N(1,iband)+2,2,(N(1,iband)+2)/2,1,buffC_z%b)
-  call rft(du   ,N(1,iband)+2,N(2,iband),1,buffR_x%b)
+  call cft(du   ,N(1,nband)+2,2,(N(1,nband)+2)/2,1,buffC_z%b)
+  call rft(du   ,N(1,nband)+2,N(2,nband),1,buffR_x%b)
 
 end subroutine
 
@@ -873,7 +883,7 @@ subroutine imm_bounds_u(duPL,uPL,NuPL,myid,status,ierr)
   !gridweightingIB = 1-((yu(1)-yu(0))/(yu(1)+1))
 
   do j = nyuIB1(myid),nyuIB2(myid)
-    call four_to_phys_du(duPL(1,1,j),bandPL(myid))
+    call four_to_phys_du(duPL(1,1,j))
   end do
 
   do ilist = 1,nlist_ib(ugrid)
@@ -891,7 +901,7 @@ end if
   end do
 
   do j = nyuIB1(myid),nyuIB2(myid)
-    call phys_to_four_du(duPL(1,1,j),bandPL(myid))
+    call phys_to_four_du(duPL(1,1,j))
   end do
 
 
@@ -970,7 +980,7 @@ subroutine imm_bounds_v(duPL,uPL,NuPL,myid,status,ierr)
   !Kibdt=Kib/dt
 
   do j = nyvIB1(myid),nyvIB2(myid)
-    call four_to_phys_du(duPL(1,1,j),bandPL(myid))
+    call four_to_phys_du(duPL(1,1,j))
   end do
 
   do ilist = 1,nlist_ib(vgrid)
@@ -1005,7 +1015,7 @@ subroutine modes_to_planes_UVP (xPL,x,grid,myid,status,ierr)
 
   integer i,k,j,jminS,jmaxS,jminR,jmaxR,dki,plband,grid
   integer column
-  integer iband,jband
+  !integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
   type(cfield) x
@@ -1018,7 +1028,7 @@ subroutine modes_to_planes_UVP (xPL,x,grid,myid,status,ierr)
   ! plband = bandPL(myid)
   yourid = myid
   ! do iband = sband,eband
-    jband = iband
+    !jband = iband
     jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
     jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
     if (jminR==Ny(grid,nband-1)+1 .and. jmaxR>=jminR) then
@@ -1042,7 +1052,7 @@ subroutine modes_to_planes_UVP (xPL,x,grid,myid,status,ierr)
     if (yourid<np) then
       ! do iband = sband,eband
       !jband=crossband(iband,yourid)
-      jband = iband
+      ! jband = iband
       jminS = max(planelim(grid,1,yourid),jlim(1,grid)+1)
       jmaxS = min(planelim(grid,2,yourid),jlim(2,grid)-1)
       jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
@@ -1093,7 +1103,7 @@ subroutine modes_to_planes_UVP (xPL,x,grid,myid,status,ierr)
 
 end subroutine
 
-subroutine modes_to_planes_phys (xPL,x,grid,myid,myiband,status,ierr)
+subroutine modes_to_planes_phys (xPL,x,grid,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!! MODES TO PLANES !!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1104,88 +1114,93 @@ subroutine modes_to_planes_phys (xPL,x,grid,myid,myiband,status,ierr)
   include 'mpif.h'             ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid
 
-  integer i,k,j,jminS,jmaxS,jminR,jmaxR,dki,plband,grid,myiband
+  integer i,k,j,jminS,jmaxS,jminR,jmaxR,dki,plband,grid !myiband
   integer column
-  integer iband,jband
+  ! integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
-  real(8)      xPL(N(1,myiband)+2,N(2,myiband),jgal(grid,1)-1:jgal(grid,2)+1)
+  type(cfield) x  
+  real(8)      xPL(N(1,nband)+2,N(2,nband),jgal(grid,1)-1:jgal(grid,2)+1)
   complex(8), allocatable :: buffS(:,:),buffR(:,:)
 
-  plband = bandPL(myid)
+  ! plband = bandPL(myid)
   yourid = myid
-  do iband = sband,eband
-    jband = iband
-    jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
-    jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
-    if (jminR==Ny(grid,0)+1  ) then
-          jminR = jminR-1
-        end if
-        if (jmaxR==Ny(grid,nband)) then
-          jmaxR = jmaxR+1
-        end if
-    do j = jminR,jmaxR
-      do column = 1,columns_num(yourid)
-        i = columns_i(column,yourid)
-        k = columns_k(column,yourid) - dk_phys(column,yourid)
-        xPL(2*i+1,k,j) = dreal(x(jband)%f(j,column))
-        xPL(2*i+2,k,j) = dimag(x(jband)%f(j,column))
-      end do
+  ! do iband = sband,eband
+  ! jband = iband
+  jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
+  jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
+  if (jminR==Ny(grid,0)+1  ) then
+        jminR = jminR-1
+      end if
+      if (jmaxR==Ny(grid,nband)) then
+        jmaxR = jmaxR+1
+      end if
+  do j = jminR,jmaxR
+    do column = 1,columns_num(yourid)
+      i = columns_i(column,yourid)
+      k = columns_k(column,yourid) - dk_phys(column,yourid)
+
+
+      write(6,*) "k", k
+
+
+      xPL(2*i+1,k,j) = dreal(x%f(j,column))
+      xPL(2*i+2,k,j) = dimag(x%f(j,column))
     end do
   end do
+  ! end do
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)
     if (yourid<np) then
-      do iband = sband,eband
-        !jband=crossband(iband,yourid)
-        jband = iband
-        jminS = max(planelim(grid,1,yourid),jlim(1,grid)+1)
-        jmaxS = min(planelim(grid,2,yourid),jlim(2,grid)-1)
-        jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
-        jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
-        if (jminS==Ny(grid,0)+1  ) then
-          jminS = jminS-1
-        end if
-        if (jmaxS==Ny(grid,nband)) then
-          jmaxS = jmaxS+1
-        end if
-        if (jminR==Ny(grid,0)+1  ) then
-          jminR = jminR-1
-        end if
-        if (jmaxR==Ny(grid,nband)) then
-          jmaxR = jmaxR+1
-        end if
-        allocate(buffS(jminS:jmaxS,columns_num(  myid)))
-        allocate(buffR(jminR:jmaxR,columns_num(yourid)))
-        msizeS = 2*(columns_num(  myid)*(jmaxS-jminS+1))  ! 2 times because it's complex
-        msizeR = 2*(columns_num(yourid)*(jmaxR-jminR+1))
-        msizeS = max(msizeS,0)
-        msizeR = max(msizeR,0)
+      ! do iband = sband,eband
+      !jband=crossband(iband,yourid)
+      ! jband = iband
+      jminS = max(planelim(grid,1,yourid),jlim(1,grid)+1)
+      jmaxS = min(planelim(grid,2,yourid),jlim(2,grid)-1)
+      jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
+      jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
+      if (jminS==Ny(grid,0)+1  ) then
+        jminS = jminS-1
+      end if
+      if (jmaxS==Ny(grid,nband)) then
+        jmaxS = jmaxS+1
+      end if
+      if (jminR==Ny(grid,0)+1  ) then
+        jminR = jminR-1
+      end if
+      if (jmaxR==Ny(grid,nband)) then
+        jmaxR = jmaxR+1
+      end if
+      allocate(buffS(jminS:jmaxS,columns_num(  myid)))
+      allocate(buffR(jminR:jmaxR,columns_num(yourid)))
+      msizeS = 2*(columns_num(  myid)*(jmaxS-jminS+1))  ! 2 times because it's complex
+      msizeR = 2*(columns_num(yourid)*(jmaxR-jminR+1))
+      msizeS = max(msizeS,0)
+      msizeR = max(msizeR,0)
 
-        do j = jminS,jmaxS
-          do column = 1,columns_num(myid)
-            buffS(j,column) = x(iband)%f(j,column)
+      do j = jminS,jmaxS
+        do column = 1,columns_num(myid)
+          buffS(j,column) = x%f(j,column)
 
-          end do
         end do
-
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
-&                         MPI_COMM_WORLD,status,ierr)
-        do j = jminR,jmaxR
-          do column = 1,columns_num(yourid)
-            i = columns_i(column,yourid)
-            k = columns_k(column,yourid) - dk_phys(column,yourid)
-            xPL(2*i+1,k,j) = dreal(buffR(j,column))
-            xPL(2*i+2,k,j) = dimag(buffR(j,column))
-          end do
-        end do
-
-        deallocate(buffR,buffS)
-
       end do
+
+      call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
+&                         MPI_COMM_WORLD,status,ierr)
+      do j = jminR,jmaxR
+        do column = 1,columns_num(yourid)
+          i = columns_i(column,yourid)
+          k = columns_k(column,yourid) - dk_phys(column,yourid)
+          xPL(2*i+1,k,j) = dreal(buffR(j,column))
+          xPL(2*i+2,k,j) = dimag(buffR(j,column))
+        end do
+      end do
+
+      deallocate(buffR,buffS)
+
+      ! end do
     end if
   end do
 
@@ -1204,17 +1219,17 @@ subroutine modes_to_planes_phys_lims (xPL,x,nystart,nyend,grid,myid,myiband,stat
 
   integer i,k,j,jminS,jmaxS,jminR,jmaxR,dki,plband,grid,myiband
   integer column,nystart,nyend
-  integer iband,jband
+  ! integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
-  real(8)      xPL(N(1,myiband)+2,N(2,myiband),limPL_FFT(grid,1,myid):limPL_FFT(grid,2,myid))
+  type(cfield) x  
+  real(8)      xPL(N(1,nband)+2,N(2,nband),limPL_FFT(grid,1,myid):limPL_FFT(grid,2,myid))
   complex(8), allocatable :: buffS(:,:),buffR(:,:)
 
   plband = bandPL_FFT(myid)
   yourid = myid
-  do iband = sband,eband
-    jband = iband
+  ! do iband = sband,eband
+    ! jband = iband
 !     jminR = max(max(limPL_FFT(grid,1,  myid),jlim(1,grid,jband)+1),nystart)
 !     jmaxR = min(min(limPL_FFT(grid,2,  myid),jlim(2,grid,jband)-1),nyend)
 jminR = max(max(limPL_FFT(grid,1,  myid),jlim(1,grid)),nystart)
@@ -1229,18 +1244,18 @@ jmaxR = min(min(limPL_FFT(grid,2,  myid),jlim(2,grid)),nyend)
       do column = 1,columns_num(yourid)
         i = columns_i(column,yourid)
         k = columns_k(column,yourid) - dk_phys(column,yourid)
-        xPL(2*i+1,k,j) = dreal(x(jband)%f(j,column))
-        xPL(2*i+2,k,j) = dimag(x(jband)%f(j,column))
+        xPL(2*i+1,k,j) = dreal(x%f(j,column))
+        xPL(2*i+2,k,j) = dimag(x%f(j,column))
       end do
     end do
-  end do
+  ! end do
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)
     if (yourid<np) then
-      do iband = sband,eband
+      ! do iband = sband,eband
         !jband=crossband(iband,yourid)
-        jband = iband
+        ! jband = iband
 !         jminS = max(max(limPL_FFT(grid,1,yourid),jlim(1,grid,iband)+1),nystart)
 !         jmaxS = min(min(limPL_FFT(grid,2,yourid),jlim(2,grid,iband)-1),nyend)
 !         jminR = max(max(limPL_FFT(grid,1,  myid),jlim(1,grid,jband)+1),nystart)
@@ -1270,13 +1285,13 @@ jmaxR = min(min(limPL_FFT(grid,2,  myid),jlim(2,grid)),nyend)
 
         do j = jminS,jmaxS
           do column = 1,columns_num(myid)
-            buffS(j,column) = x(iband)%f(j,column)
+            buffS(j,column) = x%f(j,column)
 
           end do
         end do
 
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
+        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
 &                         MPI_COMM_WORLD,status,ierr)
         do j = jminR,jmaxR
           do column = 1,columns_num(yourid)
@@ -1289,7 +1304,7 @@ jmaxR = min(min(limPL_FFT(grid,2,  myid),jlim(2,grid)),nyend)
 
         deallocate(buffR,buffS)
 
-      end do
+      ! end do
     end if
   end do
 
@@ -1311,14 +1326,14 @@ subroutine modes_to_planes_phys_lims_2 (xPL,x,nystart,nyend,grid,myid,myiband,st
   integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
+  type(cfield) x
   real(8)      xPL(N(1,myiband)+2,N(2,myiband),jgal(grid,1)-1:jgal(grid,2)+1)
   complex(8), allocatable :: buffS(:,:),buffR(:,:)
   
   plband = bandPL(myid)
   yourid = myid
-  do iband = sband,eband
-    jband = iband
+  ! do iband = sband,eband
+    ! jband = iband
     jminR = max(max(limPL_incw(grid,1,  myid),jlim(1,grid)+1),nystart)
     jmaxR = min(min(limPL_incw(grid,2,  myid),jlim(2,grid)-1),nyend)
     if (jminR==Ny(grid,0)+1  ) then
@@ -1332,16 +1347,16 @@ subroutine modes_to_planes_phys_lims_2 (xPL,x,nystart,nyend,grid,myid,myiband,st
       do column = 1,columns_num(yourid)
         i = columns_i(column,yourid)
         k = columns_k(column,yourid) - dk_phys(column,yourid)
-        xPL(2*i+1,k,j) = dreal(x(jband)%f(j,column))
-        xPL(2*i+2,k,j) = dimag(x(jband)%f(j,column))
+        xPL(2*i+1,k,j) = dreal(x%f(j,column))
+        xPL(2*i+2,k,j) = dimag(x%f(j,column))
       end do
     end do
-  end do
+  ! end do
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)
     if (yourid<np) then
-      do iband = sband,eband
+      ! do iband = sband,eband
         !jband=crossband(iband,yourid)
         jband = iband
         jminS = max(max(limPL_incw(grid,1,yourid),jlim(1,grid)+1),nystart)
@@ -1370,12 +1385,12 @@ subroutine modes_to_planes_phys_lims_2 (xPL,x,nystart,nyend,grid,myid,myiband,st
 
         do j = jminS,jmaxS
           do column = 1,columns_num(myid)
-            buffS(j,column) = x(iband)%f(j,column)
+            buffS(j,column) = x%f(j,column)
           end do
         end do
 
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
+        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
 &                         MPI_COMM_WORLD,status,ierr)
 
         do j = jminR,jmaxR
@@ -1389,7 +1404,7 @@ subroutine modes_to_planes_phys_lims_2 (xPL,x,nystart,nyend,grid,myid,myiband,st
 
         deallocate(buffR,buffS)
 
-      end do
+      ! end do
     end if
   end do
 
@@ -1745,10 +1760,11 @@ subroutine ops_in_planes(myid,flagst)
   wu_cPL = 0d0
   ww_cPL = 0d0
 
+
   do j = limPL_excw(ugrid,1,myid),limPL_excw(ugrid,2,myid)
     ! nonlinear interaction into 0th mode (bad, much easier to do if multiply by 4 and do one quadrant but need to think about k = 0 terms carefully)
-    do i = -(N(1,1)/2),N(1,1)/2
-      do k = -(N(2,1)/2),N(2,1)/2-1
+    do i = -(N(1,nband)/2),N(1,nband)/2
+      do k = -(N(2,nband)/2),N(2,nband)/2-1
         la = i
         lp = -i
         ia = iLkup(la)
@@ -1762,6 +1778,16 @@ subroutine ops_in_planes(myid,flagst)
         ! really the imaginary part should be 0 so no need to compute but anyway just in case
       end do
     end do
+
+    if(j==10) then
+      write(6,*) " Finished 0th mode nonlin =====> Linear advection", myid
+      write(6,*) "vv_cPL", vv_cPL(1,1,j), vv_cPL(2,1,j), j 
+    end if 
+
+    if(j==150) then
+      write(6,*) "vv_cPL", vv_cPL(1,1,j), vv_cPL(2,1,j), j 
+    end if 
+    
     
     ! linear advection
     ! wrong for 0th mode, 0,0 interaction should not be counted twice, but doesn't matter since differentiate = 0
@@ -1789,23 +1815,41 @@ subroutine ops_in_planes(myid,flagst)
     !   write(11) vv_cPL(:,:,j)
     !   write(11) ww_cPL(:,:,j)
     !   write(11) uw_cPL(:,:,j)
-    !   ! write(*,*) u1PL(1,1,j)
-    !   ! write(11) wu_cPL(:,:,j)
+    !   write(*,*) u1PL(1,1,j)
+    !   write(11) wu_cPL(:,:,j)
     ! end if  
+
+    ! if (j == 28) then
+    !   do i= 1,10
+    !     write(6,*) "uu_cPL", uu_cPL(i,1,22)
+    !   end do 
+    ! end if 
+
 
     ! nonlinear advection: go through a list
     ! fields = {'uu', 'uv', 'uw', 'vu', 'vv', 'vw', 'wu', 'wv', 'ww'}; in the order of 1 to 9, where the first is the passive
+
+    ! write(6,*) "=====> Non Linear advection", myid
 
     if (j > (Ngal(3,nband)+1)/2) then
       jidx = j-1
     else 
       jidx = j
     end if
+
+    if(j==10) then
+      write(6,*) "=====> nonlinear interaction into 0th mode - U", myid
+    end if 
+
     call nonlinInter(nonlin(jidx, 1), uu_cPL(1,1,j), u1PL(1,1,j), u1PL(1,1,j))
     call nonlinInter(nonlin(jidx, 3), uw_cPL(1,1,j), u3PL(1,1,j), u1PL(1,1,j))
     call nonlinInter(nonlin(jidx, 5), vv_cPL(1,1,j), u2PL_itp(1,1,j), u2PL_itp(1,1,j))
     call nonlinInter(nonlin(jidx, 7), wu_cPL(1,1,j), u1PL(1,1,j), u3PL(1,1,j))
     call nonlinInter(nonlin(jidx, 9), ww_cPL(1,1,j), u3PL(1,1,j), u3PL(1,1,j))
+
+    if(j==10) then
+      write(6,*) "=====> Finished Nonlin Inter U", myid
+    end if 
 
     ! if (j == 28) then
     !   write(ext4,'(i5.5)') int(1000d0*(t-700)+kRK)
@@ -1838,8 +1882,8 @@ subroutine ops_in_planes(myid,flagst)
     !   ! write(11) wu_cPL(:,:,j)
     ! end if  
 
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         Nu1PL(i,k,j) = du1dx(i,k)+du1dz(i,k)
         Nu3PL(i,k,j) = du3dx(i,k)+du3dz(i,k)
       end do
@@ -1852,18 +1896,22 @@ subroutine ops_in_planes(myid,flagst)
     !   write(11) Nu1PL(:,:,j)
     !   write(11) Nu3PL(:,:,j)
     ! end if
-    call four_to_phys_u(u1PL(1,1,j),u2PL_itp(1,1,j),u3PL(1,1,j),bandPL(myid))
+    call four_to_phys_u(u1PL(1,1,j),u2PL_itp(1,1,j),u3PL(1,1,j))
   end do
     
   uv_fPL = 0d0
   vu_fPL = 0d0
   vw_fPL = 0d0
   wv_fPL = 0d0
-    
+
+  if(myid==0) then
+    write(6,*) "=====> nonlinear interaction into 0th mode - V", myid
+  end if 
+
   do j = limPL_excw(vgrid,1,myid),limPL_excw(vgrid,2,myid)
     ! nonlinear interaction into 0th mode
-    do i = -(N(1,1)/2),N(1,1)/2
-      do k = -(N(2,1)/2-1),N(2,1)/2-1
+    do i = -(N(1,nband)/2),N(1,nband)/2
+      do k = -(N(2,nband)/2-1),N(2,nband)/2-1
         la = i
         lp = -i
         ia = iLkup(la)
@@ -1902,6 +1950,11 @@ subroutine ops_in_planes(myid,flagst)
     call nonlinInter(nonlin(j, 6), vw_fPL(1,1,j), u3PL_itp(1,1,j), u2PL(1,1,j))
     call nonlinInter(nonlin(j, 8), wv_fPL(1,1,j), u2PL(1,1,j), u3PL_itp(1,1,j))
 
+    if(j==10) then
+      write(6,*) "=====> Finished Nonlin Inter v", myid
+    end if 
+
+
     ! if (j == 130) then
     !   write(11) uv_fPL(:,:,j)
     !   write(11) wv_fPL(:,:,j)
@@ -1909,17 +1962,26 @@ subroutine ops_in_planes(myid,flagst)
     !   ! write(11) vw_fPL(:,:,j)
     !   close(11)
     ! end if    
-    
+ 
+
     call der_x(vu_fPL(1,1,j),du2dx,k1F_x)
     call der_z(vw_fPL(1,1,j),du2dz,k1F_z)
 
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+       if(j==10) then
+      write(6,*) "=====> Finished Derivatives", myid
+    end if 
+
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         Nu2PL(i,k,j) = du2dx(i,k)+du2dz(i,k)   
       end do
     end do
     
-    call four_to_phys_u(u1PL_itp(1,1,j),u2PL(1,1,j),u3PL_itp(1,1,j),bandPL(myid))
+    call four_to_phys_u(u1PL_itp(1,1,j),u2PL(1,1,j),u3PL_itp(1,1,j))
+
+    if(j==10) then
+      write(6,*) "=====> Finished Ops in planes", myid
+    end if 
   
   end do
   
@@ -1953,7 +2015,7 @@ subroutine nonlinInter(jlist, x_cPL, uaPL, upPL)
       kp = kLkup(pn*iNeg(lp)*jlist%list(l,4))
       kt = kLkup(pn*(jlist%list(l,2)+jlist%list(l,4)))
 
-      !write(6,*) "jlist%list(l,2)", jlist%list(l,2), "jlist%list(l,4)",  jlist%list(l,4), kLkup(0)
+      ! write(6,*) "jlist%list(l,2)", jlist%list(l,2), "jlist%list(l,4)",  jlist%list(l,4), kLkup(0)
 
        
       x_cPL(it,kt) = x_cPL(it,kt) + uaPL(ia,ka)*upPL(ip,kp) - iNeg(la)*iNeg(lp)*uaPL(ia+1,ka)*upPL(ip+1,kp) 
@@ -2025,6 +2087,7 @@ subroutine nonlinInter(jlist, x_cPL, uaPL, upPL)
   !     end do
   !   end do
   ! end do
+  
 
 end subroutine
 
@@ -2056,10 +2119,10 @@ subroutine ops_in_planes2(myid,flagst)
 
   do j = limPL_excw(ugrid,1,myid),limPL_excw(ugrid,2,myid)
 
-    call four_to_phys_u(u1PL(1,1,j),u2PL_itp(1,1,j),u3PL(1,1,j),bandPL(myid))
+    call four_to_phys_u(u1PL(1,1,j),u2PL_itp(1,1,j),u3PL(1,1,j))
 
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         uu_cPL(i,k,j) = u1PL    (i,k,j)*u1PL    (i,k,j)
         uw_cPL(i,k,j) = u1PL    (i,k,j)*u3PL    (i,k,j)
         vv_cPL(i,k,j) = u2PL_itp(i,k,j)*u2PL_itp(i,k,j)
@@ -2067,10 +2130,10 @@ subroutine ops_in_planes2(myid,flagst)
       end do
     end do
     
-    call phys_to_four_du(uu_cPL(1,1,j),bandPL(myid))
-    call phys_to_four_du(uw_cPL(1,1,j),bandPL(myid))    
-    call phys_to_four_du(vv_cPL(1,1,j),bandPL(myid))    
-    call phys_to_four_du(ww_cPL(1,1,j),bandPL(myid))  
+    call phys_to_four_du(uu_cPL(1,1,j))
+    call phys_to_four_du(uw_cPL(1,1,j))    
+    call phys_to_four_du(vv_cPL(1,1,j))    
+    call phys_to_four_du(ww_cPL(1,1,j))  
 
     ! uu_cPL(:,kLkup(-64),j) = 0
     ! uu_cPL(iLkup(64):iLkup(64)+1,:,j) = 0
@@ -2098,8 +2161,8 @@ subroutine ops_in_planes2(myid,flagst)
     call der_x(uw_cPL(1,1,j),du3dx,k1F_x)
     call der_z(ww_cPL(1,1,j),du3dz,k1F_z)
    
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         Nu1PL(i,k,j) = du1dx(i,k)+du1dz(i,k)
         Nu3PL(i,k,j) = du3dx(i,k)+du3dz(i,k)
       end do
@@ -2141,17 +2204,17 @@ subroutine ops_in_planes2(myid,flagst)
     
   do j = limPL_excw(vgrid,1,myid),limPL_excw(vgrid,2,myid)
     
-    call four_to_phys_u(u1PL_itp(1,1,j),u2PL(1,1,j),u3PL_itp(1,1,j),bandPL(myid))
+    call four_to_phys_u(u1PL_itp(1,1,j),u2PL(1,1,j),u3PL_itp(1,1,j))
     
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         uv_fPL(i,k,j) = u1PL_itp(i,k,j)*u2PL(i,k,j)
         wv_fPL(i,k,j) = u3PL_itp(i,k,j)*u2PL(i,k,j)
       end do
     end do
     
-    call phys_to_four_du(uv_fPL(1,1,j),bandPL(myid))
-    call phys_to_four_du(wv_fPL(1,1,j),bandPL(myid))
+    call phys_to_four_du(uv_fPL(1,1,j))
+    call phys_to_four_du(wv_fPL(1,1,j))
 
     ! uv_fPL(:,129,:) = 0
     ! uv_fPL(129:130,:,:) = 0
@@ -2167,8 +2230,8 @@ subroutine ops_in_planes2(myid,flagst)
     call der_x(uv_fPL(1,1,j),du2dx,k1F_x)
     call der_z(wv_fPL(1,1,j),du2dz,k1F_z)
 
-    do k = 1,Ngal(2,bandPL(myid))
-      do i = 1,Ngal(1,bandPL(myid))
+    do k = 1,Ngal(2,nband)
+      do i = 1,Ngal(1,nband)
         Nu2PL(i,k,j) = du2dx(i,k)+du2dz(i,k)   
       end do
     end do
@@ -2191,7 +2254,7 @@ subroutine ops_in_planes2(myid,flagst)
 
 end subroutine
 
-subroutine phys_to_four_du(duPL,iband)
+subroutine phys_to_four_du(duPL)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!      FOUR TO PHYS     !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2202,13 +2265,13 @@ subroutine phys_to_four_du(duPL,iband)
   use declaration
   implicit none
 
-  integer iband
-  real(8) duPL(Ngal(1,iband)+2,Ngal(2,iband))
+  !integer iband
+  real(8) duPL(Ngal(1,nband)+2,Ngal(2,nband))
 
-  call rft(duPL,Ngal(1,iband)+2,Ngal(2,iband),-1,buffRal_x%b)
-  call cft(duPL,Ngal(1,iband)+2,2,(N(1,iband)+2)/2,-1,buffCal_z%b)
+  call rft(duPL,Ngal(1,nband)+2,Ngal(2,nband),-1,buffRal_x%b)
+  call cft(duPL,Ngal(1,nband)+2,2,(N(1,nband)+2)/2,-1,buffCal_z%b)
   
-  duPL(:,Ngal(2,iband)/2+1)=0d0 !oddball advective term = 0
+  duPL(:,Ngal(2,nband)/2+1)=0d0 !oddball advective term = 0
 
 end subroutine
 

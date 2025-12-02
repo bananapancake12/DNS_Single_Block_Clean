@@ -4,14 +4,14 @@ subroutine spectra(u1,u2,u2_itp2,u3,p,myid)
   implicit none
 
   integer myid
-  type(cfield)  u1(sband:eband), u2(sband:eband), u2_itp2(sband:eband), u3(sband:eband)
-  type(cfield)  p (sband:eband)
+  type(cfield)  u1, u2, u2_itp2, u3
+  type(cfield)  p 
 
-  call buildsp  (spU ,u1(midband)%f,                   ugrid,myid)
-  call buildsp  (spV ,u2(midband)%f,                   vgrid,myid)
-  call buildsp  (spW ,u3(midband)%f,                   ugrid,myid)
-  call buildspUV(spUV,u1(midband)%f,u2_itp2(midband)%f,      myid)
-  call buildsp  (spP ,p (midband)%f,                   pgrid,myid)
+  call buildsp  (spU ,u1%f,                   ugrid,myid)
+  call buildsp  (spV ,u2%f,                   vgrid,myid)
+  call buildsp  (spW ,u3%f,                   ugrid,myid)
+  call buildspUV(spUV,u1%f,u2_itp2%f,               myid)
+  call buildsp  (spP ,p %f,                   pgrid,myid)
 
 end subroutine
 
@@ -79,9 +79,9 @@ subroutine write_spect(myid,status,ierr)
     call MPI_SEND(spUV,msizeu,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
     call MPI_SEND(spP ,msizep,MPI_REAL8,0,myid,MPI_COMM_WORLD,ierr)
   else
-    allocate(buffSPu(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,ugrid):jlim(2,ugrid)))
-    allocate(buffSPv(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,vgrid):jlim(2,vgrid)))
-    allocate(buffSPp(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,pgrid):jlim(2,pgrid)))
+    allocate(buffSPu(0:N(1,nband)/2,1:N(2,nband)/2+1,jlim(1,ugrid):jlim(2,ugrid)))
+    allocate(buffSPv(0:N(1,nband)/2,1:N(2,nband)/2+1,jlim(1,vgrid):jlim(2,vgrid)))
+    allocate(buffSPp(0:N(1,nband)/2,1:N(2,nband)/2+1,jlim(1,pgrid):jlim(2,pgrid)))
 
     fnameimb='output/spU_' //ext1//'x'//ext2//'x'//ext3//'_'//ext4//'.dat'
     call recvwrspec(spU ,buffSPu,ugrid,myid,status,ierr)
@@ -121,7 +121,7 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
   integer msize
   real(8)    spX(jlim(1,grid):jlim(2,grid),columns_num(myid))
   !The following +1 in 1:N(2,midband)/2+1 shouldn't be there but is consistent with the postprocessing....
-  real(8) buffSP(0:N(1,midband)/2,1:N(2,midband)/2+1,jlim(1,grid):jlim(2,grid))
+  real(8) buffSP(0:N(1,nband)/2,1:N(2,nband)/2+1,jlim(1,grid):jlim(2,grid))
   real(8), allocatable:: buffrecv(:,:)
   integer, allocatable:: dummint(:)
 
@@ -131,11 +131,12 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
     do column = 1,columns_num(myid)
       i = columns_i(column,myid)
       k = columns_k(column,myid)
-      if (k > N(2,1)/2) then
-        kk = N(2,1)+2-k
+      if (k > N(2,nband)/2) then
+        kk = N(2,nband)+2-k
       else
         kk = k
       end if
+      ! write(6,*) "kk", kk, j 
       buffSP(i,kk,j) = spX(j,column)
     end do
   end do
@@ -148,8 +149,8 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
       do column = 1,columns_num(iproc)
         i = columns_i(column,iproc)
         k = columns_k(column,iproc)
-        if (k > N(2,1)/2) then
-          kk = N(2,1)+2-k
+        if (k > N(2,nband)/2) then
+          kk = N(2,nband)+2-k
         else
           kk = k
         end if
