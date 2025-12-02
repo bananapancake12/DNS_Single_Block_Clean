@@ -582,7 +582,7 @@ end if
 
 
   allocate(indior(1:Ngal(1,nband)))
-  do i = -dnx/2+1,0
+  do i = 1,0
     indior(i) = i + Ngal(1,nband)
   end do
   do i = 1,Ngal(1,nband)
@@ -1568,10 +1568,10 @@ subroutine ygrid
 
 
 
-  ! write(6,*) "Ny:"
-  ! do i = 1,3
-  !   write(6,*) Ny(i,0:4)
-  ! end do
+  write(6,*) "Ny:"
+  do i = 1,3
+    write(6,*) Ny(i,0:4)
+  end do
 
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! ! TODO check
@@ -1943,14 +1943,15 @@ subroutine def_k
   end do
 
 
-  ! do k = 0,N(2,nband)/2-1
-  !   kLkup(k) =  k+1
-  !   write(6,*) "kLkup", kLkup(k)
-  ! end do
+  do k = 0,N(2,nband)/2-1
+    kLkup(k) =  k+1
+    ! write(6,*) "kLkup", kLkup(k), k 
+  end do
 
   kLkup(N(2,nband)/2) = -N(2,nband)/2 + 1 + Ngal(2,nband)
   do k = -N(2,nband)/2,-1
     kLkup(k) = k + 1 + Ngal(2,nband)
+    ! write(6,*) "kLkup", kLkup(k), k 
   end do
   
   
@@ -2587,7 +2588,7 @@ subroutine proc_lims_columns(myid)
         do column = 1,columns_num(iproc)
           if (columns_k(column,iproc) > N(2,nband)/2) then
             dk(column,iproc) = N(2,nband)-Ngal(2,nband)
-            write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
+            !write(6,*)'col_k=',columns_k(column,iproc), 'dk=', dk(column,iproc),"iproc", iproc
           end if
     end do
   end do
@@ -3759,7 +3760,13 @@ subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
   call planes_to_modes_UVP(u3,u3PL,2,myid,status,ierr)
   call planes_to_modes_UVP(p ,ppPL,3,myid,status,ierr)
   ! write(6,*) " finished pplanes to modes"
-  
+
+  ! if(myid ==0) then 
+  !   do j= 1, 22
+  !     write(6,*) p%f(j,1)
+  !   end do
+  ! end if 
+
   ! Chris' trick
   !Pressure reset
 !  print *, "pressure reset"
@@ -4182,26 +4189,26 @@ subroutine read_in(myid)
     nzzv(N2(3,0))=N2(2,1)
     nxxp(N2(4,0)+1)=N2(1,1)+2
     nzzp(N2(4,0)+1)=N2(2,1)
-    do iband=1,nband
-      do j=N2(4,iband-1)+1,N2(4,iband)
-        nxxu(j)=N2(1,iband)+2
-        nzzu(j)=N2(2,iband)
-      end do
-      do j=N2(3,iband-1)+1,N2(3,iband)
-        nxxv(j)=N2(1,iband)+2
-        nzzv(j)=N2(2,iband)
-      end do
-      do j=max(N2(4,iband-1),N2(4,0)+1),min(N2(4,iband),N2(4,nband)-1)
-        nxxp(j)=N2(1,iband)+2
-        nzzp(j)=N2(2,iband)
-      end do
-      nxxp(N2(4,1))=nxxp(N2(4,1)+1)
-      nzzp(N2(4,1))=nzzp(N2(4,1)+1)
-      nxxp(N2(4,2))=nxxp(N2(4,2)-1)
-      nzzp(N2(4,2))=nzzp(N2(4,2)-1)
-      nxxp(N2(4,2)+1)=nxxp(N2(4,2)-1)
-      nzzp(N2(4,2)+1)=nzzp(N2(4,2)-1)
+    ! do iband=1,nband
+    do j=N2(4,0)+1,N2(4,nband)
+      nxxu(j)=N2(1,nband)+2
+      nzzu(j)=N2(2,nband)
     end do
+    do j=N2(3,0)+1,N2(3,nband)
+      nxxv(j)=N2(1,nband)+2
+      nzzv(j)=N2(2,nband)
+    end do
+    do j= N2(4,0)+1,N2(4,nband)-1
+      nxxp(j)=N2(1,nband)+2
+      nzzp(j)=N2(2,nband)
+    end do
+    nxxp(N2(4,1))=nxxp(N2(4,1)+1)
+    nzzp(N2(4,1))=nzzp(N2(4,1)+1)
+    nxxp(N2(4,2))=nxxp(N2(4,2)-1)
+    nzzp(N2(4,2))=nzzp(N2(4,2)-1)
+    nxxp(N2(4,2)+1)=nxxp(N2(4,2)-1)
+    nzzp(N2(4,2)+1)=nzzp(N2(4,2)-1)
+    ! end do
     nxxu(N2(4,nband)+1)=N2(1,nband)+2
     nzzu(N2(4,nband)+1)=N2(2,nband)
     nxxv(N2(3,nband)+1)=N2(1,nband)+2
@@ -4364,6 +4371,12 @@ subroutine read_in(myid)
     read(10)
     jp1=jgal(3,1)-1
     jp2=jgal(3,2)
+
+    
+    !if(myid ==0) then 
+    ! write (6,*) "jp1", jp1, "jp2", jp2, "jgal(3,1)", jgal(3,1), myid 
+    !end if 
+
     jp1=max(jp1,N2(4,0)+1)
     do j=N2(4,0)+1,jp1-1
       read(10)
@@ -4374,6 +4387,7 @@ subroutine read_in(myid)
       allocate(buffSR(nx,nz))
       read(10) jin,dummI,nxin,nzin,dummRe,buffSR
       call buff_to_u(ppPL(1,1,j),buffSR,nx,nz,igal,kgal)
+      !write(6,*) "ppPL", ppPL(1,1,j), j 
       deallocate(buffSR)
       if (nx/=nxin .or. nz/=nzin) then
         write(*,*) 'WARNING!: unexpected size of plane',j
@@ -5110,8 +5124,12 @@ subroutine nonlinRead
     end do
 
 
-    !write(6,*) "j=", j, "weight", weight(j)
+    ! do i= jlow, jupp+1
+    !   write(6,*) "j=", j, "weight", weight(j)
+    ! end do 
+    
 
+    ! write(6,*) "weight(j)", weight(:)
 
     deallocate(tmpInt)
     close(40)

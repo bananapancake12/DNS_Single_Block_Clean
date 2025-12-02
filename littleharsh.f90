@@ -58,6 +58,26 @@
 !            v_corr - Pressure correction step
 !                     - Called form littleharsh
 !
+!            littleharsh      - 
+!            divergence       -
+!            laplacian_U      -
+!            laplacian_V      -
+!            error            -
+!            finalize         -
+!            flowrateIm       -
+!            flowrateRe       -
+!            flowrate_corr    -
+!            maxvel           -
+!            meanflow_ctP     -
+!            meanflow_ctU     -
+!            solveP           -
+!            RHS0_u1          -
+!            RHS0_u2          -
+!            RHS0_u3          -
+!            solveU           -
+!            solveV           -
+!            v_corr           -
+!
 ! *************************************************************************************************************** !
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -193,6 +213,11 @@ nextqt = floor(t*10d0)/10d0+0.1d0
 
       ! Build non-linear terms of right-hand-side of Navier-Stokes equation
       call nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
+      
+      if(myid==0) then
+        write(6,*) "Finished Nonlinear =====> Solving"
+      end if 
+
       ! Resolve the matricial system
       call solveU(u1,du1,1,myid)
       call solveV(u2,du2,2,myid)
@@ -905,6 +930,7 @@ subroutine RHS0_u2(du2,u2,Nu2,p,myid)
     end do
 
     ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'U2'
     !   write(6,*) 'du1, j=1..10:'
     !   do j = 1, 10
     !     write(6,*) real(du2%f(j,column)), aimag(du2%f(j,column))
@@ -957,10 +983,21 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
     end do
 
     ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'U3'
     !   write(6,*) 'du3, j=1..10:'
     !   do j = 1, 10
     !     write(6,*) real(du3%f(j,column)), aimag(du3%f(j,column))
+        
     !   end do
+    ! end if
+
+    ! if (column == 1 .and. myid == 0) then
+    !   write(6,*) 'du3, j=1..10:'
+    !   do j = 1, 10
+    !     write(6,*) 'nu2, p'
+    !     write(6,*) Nu3%f(j  ,column), p%f(j,  column)
+    !   end do
+
     ! end if
     
   end do

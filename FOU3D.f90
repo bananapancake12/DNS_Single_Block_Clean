@@ -50,10 +50,16 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   
   integer iband,flagst,flagwr,flagslinst,flagqwr,j,i,k,column
   real(8) C1
-  type(cfield)  u1(sband:eband), u2(sband:eband), u3(sband:eband)
-  type(cfield) du1(sband:eband),du2(sband:eband),du3(sband:eband)
-  type(cfield) Nu1(sband:eband),Nu2(sband:eband),Nu3(sband:eband)
-  type(cfield)  p (sband:eband),div(sband:eband)
+  ! type(cfield)  u1(sband:eband), u2(sband:eband), u3(sband:eband)
+  ! type(cfield) du1(sband:eband),du2(sband:eband),du3(sband:eband)
+  ! type(cfield) Nu1(sband:eband),Nu2(sband:eband),Nu3(sband:eband)
+  ! type(cfield)  p (sband:eband),div(sband:eband)
+
+  type(cfield) u1, u2, u3
+  type(cfield) du1, du2, du3
+  type(cfield) Nu1, Nu2, Nu3
+  type(cfield) p, div
+
   
   if (iter-iter0>=nstat .and. kRK==1) then
     flagst = 1
@@ -87,10 +93,16 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   u2PL_itp = 0d0
   u3PL_itp = 0d0
 
+  if(myid==0) then
+    write(6,*) "=====> Interpolating"
+  end if
+
   !C! Interpolate the grid velocities to the other grid points
   call interp_u(u1_itp,u1,myid)
   call interp_v(u2_itp,u2,myid)
   call interp_u(u3_itp,u3,myid) 
+
+
 
   u1PL  = 0d0
   u2PL  = 0d0
@@ -102,6 +114,11 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   du2PL = 0d0
   du3PL = 0d0
 
+
+  if(myid==0) then
+    write(6,*) "=====> Modes to planes"
+  end if
+
   !C! Shift 6 velocity fields into planes
   !!!!!!!!!!  modes to planes: !!!!!!!!!!
   call modes_to_planes_UVP ( u1PL,    u1,    ugrid,myid,status,ierr)
@@ -110,6 +127,12 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   call modes_to_planes_UVP ( u1PL_itp,u1_itp,vgrid,myid,status,ierr)
   call modes_to_planes_UVP ( u2PL_itp,u2_itp,ugrid,myid,status,ierr)
   call modes_to_planes_UVP ( u3PL_itp,u3_itp,vgrid,myid,status,ierr)
+
+
+  
+  if(myid==0) then
+    write(6,*) "=====> Spectra"
+  end if
 
   !!!!!!!!!!!!!   spectra:  !!!!!!!!!!!!!
   if (flagst==1) then
@@ -132,6 +155,10 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   !   call Qcriterion(myid)  
     
   ! endif
+
+  if(myid==0) then
+    write(6,*) "=====> Record Out"
+  end if
 
   !!!!!!!!!!!!! record out: !!!!!!!!!!!!!
   if (flagwr==1) then
@@ -220,8 +247,16 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   ! u2PL_itp(iLkup(64):iLkup(64)+1,:,:) = 0
   ! u3PL_itp(iLkup(64):iLkup(64)+1,:,:) = 0
 
+  if(myid==0) then
+    write(6,*) "=====> Ops in Planes"
+  end if
+
   !!!!!!!!! four to ops: !!!!!!!!!
   call ops_in_planes(myid,flagst) !C! ops in planes to compute velocity products and x/z derriatives
+
+  if(myid==0) then
+    write(6,*) "=====> Planes to modes"
+  end if
 
   !C! Shift y derrivative products to modes
   call planes_to_modes_UVP(uv_f,uv_fPL,vgrid,myid,status,ierr)
@@ -234,23 +269,31 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   call planes_to_modes_NUVP(Nu2,Nu2PL,vgrid,myid,status,ierr)
   call planes_to_modes_NUVP(Nu3,Nu3PL,ugrid,myid,status,ierr)
 
+  if(myid==0) then
+    write(6,*) "=====> Derivatives"
+  end if
+
   !C! Calculate y derrivatives
-   do iband = sband,eband
-     call der_yu_h(Nu1_dy%f,uv_f%f,iband,myid)
-     call der_yv_h(Nu2_dy%f,vv_c%f,iband,myid)
-     call der_yu_h(Nu3_dy%f,wv_f%f,iband,myid)
-    
-   !C! Calculate final advective term
-     do column = 1,columns_num(myid)
-       do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-         Nu1(iband)%f(j,column) = Nu1(iband)%f(j,column)+Nu1_dy%f(j,column)
-         Nu3(iband)%f(j,column) = Nu3(iband)%f(j,column)+Nu3_dy%f(j,column)
-       end do
-       do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
-         Nu2(iband)%f(j,column) = Nu2(iband)%f(j,column)+Nu2_dy%f(j,column)
-       enddo
-     enddo
-   enddo   
+   ! do iband = sband,eband
+    call der_yu_h(Nu1_dy%f,uv_f%f,iband,myid)
+    call der_yv_h(Nu2_dy%f,vv_c%f,iband,myid)
+    call der_yu_h(Nu3_dy%f,wv_f%f,iband,myid)
+  
+  !C! Calculate final advective term
+    do column = 1,columns_num(myid)
+      do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+        Nu1%f(j,column) = Nu1%f(j,column)+Nu1_dy%f(j,column)
+        Nu3%f(j,column) = Nu3%f(j,column)+Nu3_dy%f(j,column)
+      end do
+      do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
+        Nu2%f(j,column) = Nu2%f(j,column)+Nu2_dy%f(j,column)
+      enddo
+    enddo
+   ! enddo   
+
+  if(myid==0) then
+    write(6,*) "=====> CFL and Stats"
+  end if
 
 
   !!!!!!!!!!!  CFL and stats: !!!!!!!!!!!
@@ -263,16 +306,26 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
     t   = t+dt
     ! Calculating and writing stats and spectra
     if (flagst==1) then
+
+    if(myid==0) then
+      write(6,*) " CFL and Stats =====> calc omega"
+    end if
     
     !C! Calculate Omega_x
     u2PLN=0d0
     call modes_to_planes_phys (u2PLN,u2,vgrid,myid,bandPL(myid),status,ierr)    
     
     do j = limPL_incw(vgrid,1,myid),limPL_incw(vgrid,2,myid)
-      call der_z_N(u2PLN(1,1,j),wx(:,:,j),k1F_z,bandPL(myid)) !C! u2PL in Fourier space
+      call der_z_N(u2PLN(1,1,j),wx(:,:,j),k1F_z) !C! u2PL in Fourier space
+
+      if(j == 10 ) then
+        write(6,*) "wx", wx(:,10,j)
+      end if 
+
+
     end do
     do iband = sband,eband
-      call der_yv_h_wx(du3dy_columns%f,u3(iband)%f,iband,myid)
+      call der_yv_h_wx(du3dy_columns%f,u3%f,iband,myid)
     end do
 
     call modes_to_planes_phys(du3dy_planes,du3dy_columns,vgrid,myid,bandPL(myid),status,ierr)
@@ -356,17 +409,17 @@ subroutine nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
   
   !Update RHS with new advective term. du now full RHS
   C1 = -gRK(kRK)
-  do iband = sband,eband
-    do column = 1,columns_num(myid)
-      do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-        du1(iband)%f(j,column) = du1(iband)%f(j,column)+C1*Nu1(iband)%f(j,column)
-        du3(iband)%f(j,column) = du3(iband)%f(j,column)+C1*Nu3(iband)%f(j,column)
-      enddo
-      do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
-        du2(iband)%f(j,column) = du2(iband)%f(j,column)+C1*Nu2(iband)%f(j,column)
-      enddo
+  ! do iband = sband,eband
+  do column = 1,columns_num(myid)
+    do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+      du1%f(j,column) = du1%f(j,column)+C1*Nu1%f(j,column)
+      du3%f(j,column) = du3%f(j,column)+C1*Nu3%f(j,column)
+    enddo
+    do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
+      du2%f(j,column) = du2%f(j,column)+C1*Nu2%f(j,column)
     enddo
   enddo
+  ! enddo
 
   !C! Calculate immersed boundaries
 !   call modes_to_planes_dU(du1PL,du1,myid,status,ierr)
@@ -391,17 +444,17 @@ subroutine interp_u(u_itp,u,myid)
   implicit none
   
   integer j,iband,column,myid
-  type(cfield)  u(sband:eband)
-  type(cfield)  u_itp(sband:eband)
+  type(cfield)  u
+  type(cfield)  u_itp
   
- do iband = sband,eband
+!  do iband = sband,eband
    do column = 1,columns_num(myid)
      ! We interpolate everything. vgrid has got one less point than ugrid
      do j = jlim(1,vgrid),jlim(2,vgrid)  
-       u_itp(iband)%f(j,column) = ((yv(j)-yu(j))*u(iband)%f(j+1,column)+(yu(j+1)-yv(j))*u(iband)%f(j,column))/(yu(j+1)-yu(j))
+       u_itp%f(j,column) = ((yv(j)-yu(j))*u%f(j+1,column)+(yu(j+1)-yv(j))*u%f(j,column))/(yu(j+1)-yu(j))
      end do
    end do
- end do
+!  end do
   
 end subroutine
 
@@ -413,26 +466,27 @@ subroutine interp_v(u_itp,u,myid)
   implicit none
   
   integer j,iband,column,myid
-  type(cfield)  u(sband:eband)
-  type(cfield)  u_itp(sband:eband)
+  type(cfield)  u
+  type(cfield)  u_itp
   
- do iband = sband,eband
-   do column = 1,columns_num(myid)
-     do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-       u_itp(iband)%f(j,column) = ((yu(j)-yv(j-1))*u(iband)%f(j,column)+(yv(j)-yu(j))*u(iband)%f(j-1,column))/(yv(j)-yv(j-1))
-     end do
-     u_itp(iband)%f(jlim(1,ugrid),column) = &
-&      gridweighting_interp(1)*(u(iband)%f(jlim(1,vgrid),column)-u_itp(iband)%f(jlim(1,ugrid)+1,column)) &
-&      + u_itp(iband)%f(jlim(1,ugrid)+1,column)
-     u_itp(iband)%f(jlim(2,ugrid),column) = &
-&      gridweighting_interp(2)*(u(iband)%f(jlim(2,vgrid),column)-u_itp(iband)%f(jlim(2,ugrid)-1,column)) &
-&      + u_itp(iband)%f(jlim(2,ugrid)-1,column)
-   end do
- end do
+ ! do iband = sband,eband
+  do column = 1,columns_num(myid)
+    do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+      u_itp%f(j,column) = ((yu(j)-yv(j-1))*u%f(j,column)+(yv(j)-yu(j))*u%f(j-1,column))/(yv(j)-yv(j-1))
+    end do
+    u_itp%f(jlim(1,ugrid),column) = &
+&      gridweighting_interp(1)*(u%f(jlim(1,vgrid),column)-u_itp%f(jlim(1,ugrid)+1,column)) &
+&      + u_itp%f(jlim(1,ugrid)+1,column)
+    u_itp%f(jlim(2,ugrid),column) = &
+&      gridweighting_interp(2)*(u%f(jlim(2,vgrid),column)-u_itp%f(jlim(2,ugrid)-1,column)) &
+&      + u_itp%f(jlim(2,ugrid)-1,column)
+  end do
+ ! end do
                   
 end subroutine
 
-subroutine der_x(u,dudx,kx,iband)
+
+subroutine der_x(u,dudx,kx)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!  NONLINEAR DER TERMS  !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -442,37 +496,38 @@ subroutine der_x(u,dudx,kx,iband)
   use declaration
   implicit none
 
-  integer i,k,iband
-  complex(8) u   (0:Ngal(1,iband)/2,Ngal(2,iband))
-  complex(8) dudx(0:Ngal(1,iband)/2,Ngal(2,iband))
-  complex(8) kx(0:N(1,1)/2)
+  integer i,k
+  complex(8) u   (0:Ngal(1,nband)/2,Ngal(2,nband))
+  complex(8) dudx(0:Ngal(1,nband)/2,Ngal(2,nband))
+  complex(8) kx(0:N(1,nband)/2)
 
-  do k = 1,N(2,iband)/2
-    do i = 0,N(1,iband)/2
+  do k = 1,N(2,nband)/2
+    do i = 0,N(1,nband)/2
       dudx(i,k) = kx(i)*u(i,k)
     end do
-    do i = N(1,iband)/2+1,Ngal(1,iband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
+    do i = N(1,nband)/2+1,Ngal(1,nband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
       dudx(i,k) = 0d0                               !!!!!!!!!!!!  must be explicitly specified
     end do
   end do
+
   !Zeros includes mode Nz/2+1 mode (zero for advection derrivatives)
-  do k = N(2,iband)/2+1,Ngal(2,iband)-N(2,iband)/2+1!!!!!!!!!!!!  Zeros for the antialiasing region (z-dir)
-    do i = 0,Ngal(1,iband)/2                        !!!!!!!!!!!!
+  do k = N(2,nband)/2+1,Ngal(2,nband)-N(2,nband)/2+1!!!!!!!!!!!!  Zeros for the antialiasing region (z-dir)
+    do i = 0,Ngal(1,nband)/2                        !!!!!!!!!!!!
       dudx(i,k) = 0d0                               !!!!!!!!!!!!  must be explicitly specified
     end do
   end do
-  do k = Ngal(2,iband)-N(2,iband)/2+2,Ngal(2,iband)
-    do i = 0,N(1,iband)/2
+  do k = Ngal(2,nband)-N(2,nband)/2+2,Ngal(2,nband)
+    do i = 0,N(1,nband)/2
       dudx(i,k) = kx(i )*u(i,k)
     end do
-    do i = N(1,iband)/2+1,Ngal(1,iband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
+    do i = N(1,nband)/2+1,Ngal(1,nband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
       dudx(i,k) = 0d0                               !!!!!!!!!!!!  must be explicitly specified
     end do
   end do
 
 end subroutine
 
-subroutine der_x_N(u,dudx,kx,iband) !For N
+subroutine der_x_N(u,dudx,kx) !For N
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!  NONLINEAR DER TERMS  !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -482,20 +537,20 @@ subroutine der_x_N(u,dudx,kx,iband) !For N
   use declaration
   implicit none
 
-  integer i,k,iband,dk2,k2
-  complex(8) u   (0:N(1,iband)/2,N(2,iband))
-  complex(8) dudx(0:N(1,iband)/2,N(2,iband))
-  complex(8) kx(0:N(1,1)/2)
+  integer i,k,dk2,k2
+  complex(8) u   (0:N(1,nband)/2,N(2,nband))
+  complex(8) dudx(0:N(1,nband)/2,N(2,nband))
+  complex(8) kx(0:N(1,nband)/2)
 
-  do k = 1,N(2,iband)
-    do i = 0,N(1,iband)/2
+  do k = 1,N(2,nband)
+    do i = 0,N(1,nband)/2
       dudx(i,k) = kx(i)*u(i,k)
     end do
   end do
   
 end subroutine
 
-subroutine der_z(u,dudz,kz,iband)
+subroutine der_z(u,dudz,kz)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!  NONLINEAR DER TERMS  !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -505,40 +560,40 @@ subroutine der_z(u,dudz,kz,iband)
   use declaration
   implicit none
 
-  integer i,k,iband,dk2,k2
-  complex(8) u   (0:Ngal(1,iband)/2,Ngal(2,iband))
-  complex(8) dudz(0:Ngal(1,iband)/2,Ngal(2,iband))
-  complex(8) kz(1:N(2,1))
+  integer i,k,dk2,k2
+  complex(8) u   (0:Ngal(1,nband)/2,Ngal(2,nband))
+  complex(8) dudz(0:Ngal(1,nband)/2,Ngal(2,nband))
+  complex(8) kz(1:N(2,nband))
 
-  dk2=N(2,1)-Ngal(2,iband)
+  dk2=N(2,nband)-Ngal(2,nband)
 
-  do k = 1,N(2,iband)/2
-    do i = 0,N(1,iband)/2
+  do k = 1,N(2,nband)/2
+    do i = 0,N(1,nband)/2
       dudz(i,k) = kz(k)*u(i,k)
     end do
-    do i = N(1,iband)/2+1,Ngal(1,iband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
+    do i = N(1,nband)/2+1,Ngal(1,nband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
       dudz(i,k) = 0d0
     end do
   end do
   !Zeros includes mode Nz/2+1 mode (zero for advection derrivatives)
-  do k = N(2,iband)/2+1,Ngal(2,iband)-N(2,iband)/2+1!!!!!!!!!!!!  Zeros for the antialiasing region (z-dir)
-    do i = 0,Ngal(1,iband)/2
+  do k = N(2,nband)/2+1,Ngal(2,nband)-N(2,nband)/2+1!!!!!!!!!!!!  Zeros for the antialiasing region (z-dir)
+    do i = 0,Ngal(1,nband)/2
       dudz(i,k) = 0d0
     end do
   end do
-  do k = Ngal(2,iband)-N(2,iband)/2+2,Ngal(2,iband)
+  do k = Ngal(2,nband)-N(2,nband)/2+2,Ngal(2,nband)
     k2 = k+dk2
-    do i = 0,N(1,iband)/2
+    do i = 0,N(1,nband)/2
       dudz(i,k) = kz(k2)*u(i,k)
     end do
-    do i = N(1,iband)/2+1,Ngal(1,iband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
+    do i = N(1,nband)/2+1,Ngal(1,nband)/2           !!!!!!!!!!!!  Zeros for the antialiasing region (x-dir)
       dudz(i,k) = 0d0
     end do
   end do
 
 end subroutine
 
-subroutine der_z_N(u,dudz,kz,iband)
+subroutine der_z_N(u,dudz,kz)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!  NONLINEAR DER TERMS  !!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -548,30 +603,31 @@ subroutine der_z_N(u,dudz,kz,iband)
   use declaration
   implicit none
 
-  integer i,k,iband,dk2,k2
-  complex(8) u   (0:N(1,iband)/2,N(2,iband))
-  complex(8) dudz(0:N(1,iband)/2,N(2,iband))
-  complex(8) kz(1:N(2,1))
+  integer i,k,dk2,k2, iband
+  complex(8) u   (0:N(1,nband)/2,N(2,nband))
+  complex(8) dudz(0:N(1,nband)/2,N(2,nband))
+  complex(8) kz(1:N(2,nband))
 
-  if(iband/=2)then
-    do k = 1,N(2,iband)
-      do i = 0,N(1,iband)/2
-	dudz(i,k) = kz(k)*u(i,k)
+  ! if(iband/=2)then
+    do k = 1,N(2,nband)
+      do i = 0,N(1,nband)/2
+	      dudz(i,k) = kz(k)*u(i,k)
       end do
     end do
-  else
-    do k = 1,N(2,iband)/2
-      do i = 0,N(1,iband)/2
-	dudz(i,k) = kz(k)*u(i,k)
-      end do
-    end do
-    dk2=N(2,1)-N(2,2)
-    do k = N(2,iband)/2+1,N(2,iband)
-      do i = 0,N(1,iband)/2
-	dudz(i,k) = kz(k+dk2)*u(i,k)
-      end do
-    end do
-  endif
+
+  ! ! else
+  !   do k = 1,N(2,iband)/2
+  !     do i = 0,N(1,iband)/2
+	! dudz(i,k) = kz(k)*u(i,k)
+  !     end do
+  !   end do
+  !   ! dk2=N(2,1)-N(2,2)
+  !   do k = N(2,iband)/2+1,N(2,iband)
+  !     do i = 0,N(1,iband)/2
+	! dudz(i,k) = kz(k)*u(i,k)
+  !     end do
+  !   end do
+  ! endif
 
 end subroutine
 
@@ -952,85 +1008,86 @@ subroutine modes_to_planes_UVP (xPL,x,grid,myid,status,ierr)
   integer iband,jband
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
+  type(cfield) x
   real(8)      xPL(igal,kgal,jgal(grid,1)-1:jgal(grid,2)+1)
   complex(8), allocatable :: buffS(:,:),buffR(:,:)
 
   ! Loop for itself
   ! Transpose the cube that it already owns
-  plband = bandPL(myid)
+
+  ! plband = bandPL(myid)
   yourid = myid
-  do iband = sband,eband
+  ! do iband = sband,eband
     jband = iband
     jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
     jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
-    if (jminR==Ny(grid,plband-1)+1 .and. jmaxR>=jminR) then
+    if (jminR==Ny(grid,nband-1)+1 .and. jmaxR>=jminR) then
       jminR = jminR-1
     end if
-    if (jmaxR==Ny(grid,plband  )   .and. jmaxR>=jminR) then
+    if (jmaxR==Ny(grid,nband  )   .and. jmaxR>=jminR) then
       jmaxR = jmaxR+1
     end if
     do j = jminR,jmaxR
       do column = 1,columns_num(yourid)
         i = columns_i(column,yourid)
         k = columns_k(column,yourid) - dk(column,yourid)
-        xPL(2*i+1,k,j) = dreal(x(jband)%f(j,column))
-        xPL(2*i+2,k,j) = dimag(x(jband)%f(j,column))
+        xPL(2*i+1,k,j) = dreal(x%f(j,column))
+        xPL(2*i+2,k,j) = dimag(x%f(j,column))
       end do
     end do
-  end do
+  ! end do
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)
     if (yourid<np) then
-      do iband = sband,eband
-        !jband=crossband(iband,yourid)
-        jband = iband
-        jminS = max(planelim(grid,1,yourid),jlim(1,grid)+1)
-        jmaxS = min(planelim(grid,2,yourid),jlim(2,grid)-1)
-        jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
-        jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
-        if (jminS==Ny(grid,0)+1  ) then
-          jminS = jminS-1
-        end if
-        if (jmaxS==Ny(grid,nband)) then
-          jmaxS = jmaxS+1
-        end if
-        if (jminR==Ny(grid,0)+1  ) then
-          jminR = jminR-1
-        end if
-        if (jmaxR==Ny(grid,nband)) then
-          jmaxR = jmaxR+1
-        end if
-        allocate(buffS(jminS:jmaxS,columns_num(  myid)))
-        allocate(buffR(jminR:jmaxR,columns_num(yourid)))
-        msizeS = 2*(columns_num(  myid)*(jmaxS-jminS+1))  ! 2 times because it's complex
-        msizeR = 2*(columns_num(yourid)*(jmaxR-jminR+1))
-        msizeS = max(msizeS,0)
-        msizeR = max(msizeR,0)
+      ! do iband = sband,eband
+      !jband=crossband(iband,yourid)
+      jband = iband
+      jminS = max(planelim(grid,1,yourid),jlim(1,grid)+1)
+      jmaxS = min(planelim(grid,2,yourid),jlim(2,grid)-1)
+      jminR = max(planelim(grid,1,  myid),jlim(1,grid)+1)
+      jmaxR = min(planelim(grid,2,  myid),jlim(2,grid)-1)
+      if (jminS==Ny(grid,0)+1  ) then
+        jminS = jminS-1
+      end if
+      if (jmaxS==Ny(grid,nband)) then
+        jmaxS = jmaxS+1
+      end if
+      if (jminR==Ny(grid,0)+1  ) then
+        jminR = jminR-1
+      end if
+      if (jmaxR==Ny(grid,nband)) then
+        jmaxR = jmaxR+1
+      end if
+      allocate(buffS(jminS:jmaxS,columns_num(  myid)))
+      allocate(buffR(jminR:jmaxR,columns_num(yourid)))
+      msizeS = 2*(columns_num(  myid)*(jmaxS-jminS+1))  ! 2 times because it's complex
+      msizeR = 2*(columns_num(yourid)*(jmaxR-jminR+1))
+      msizeS = max(msizeS,0)
+      msizeR = max(msizeR,0)
 
-        do j = jminS,jmaxS
-          do column = 1,columns_num(myid)
-            buffS(j,column) = x(iband)%f(j,column)
+      do j = jminS,jmaxS
+        do column = 1,columns_num(myid)
+          buffS(j,column) = x%f(j,column)
 
-          end do
         end do
-
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
-&                         MPI_COMM_WORLD,status,ierr)
-        do j = jminR,jmaxR
-          do column = 1,columns_num(yourid)
-            i = columns_i(column,yourid)
-            k = columns_k(column,yourid) - dk(column,yourid)
-            xPL(2*i+1,k,j) = dreal(buffR(j,column))
-            xPL(2*i+2,k,j) = dimag(buffR(j,column))
-          end do
-        end do
-
-        deallocate(buffR,buffS)
-
       end do
+
+      call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
+&                         MPI_COMM_WORLD,status,ierr)
+      do j = jminR,jmaxR
+        do column = 1,columns_num(yourid)
+          i = columns_i(column,yourid)
+          k = columns_k(column,yourid) - dk(column,yourid)
+          xPL(2*i+1,k,j) = dreal(buffR(j,column))
+          xPL(2*i+2,k,j) = dimag(buffR(j,column))
+        end do
+      end do
+
+      deallocate(buffR,buffS)
+
+      ! end do
     end if
   end do
 
@@ -1764,10 +1821,10 @@ subroutine ops_in_planes(myid,flagst)
     ! end if  
 
     ! differentiate in x and z
-    call der_x(uu_cPL(1,1,j),du1dx,k1F_x,bandPL(myid))
-    call der_z(uw_cPL(1,1,j),du1dz,k1F_z,bandPL(myid))
-    call der_x(wu_cPL(1,1,j),du3dx,k1F_x,bandPL(myid))
-    call der_z(ww_cPL(1,1,j),du3dz,k1F_z,bandPL(myid))
+    call der_x(uu_cPL(1,1,j),du1dx,k1F_x)
+    call der_z(uw_cPL(1,1,j),du1dz,k1F_z)
+    call der_x(wu_cPL(1,1,j),du3dx,k1F_x)
+    call der_z(ww_cPL(1,1,j),du3dz,k1F_z)
    
     ! if (j == 28) then
     !   write(ext4,'(i5.5)') int(1000d0*(t-700)+kRK)
@@ -1853,8 +1910,8 @@ subroutine ops_in_planes(myid,flagst)
     !   close(11)
     ! end if    
     
-    call der_x(vu_fPL(1,1,j),du2dx,k1F_x,bandPL(myid))
-    call der_z(vw_fPL(1,1,j),du2dz,k1F_z,bandPL(myid))
+    call der_x(vu_fPL(1,1,j),du2dx,k1F_x)
+    call der_z(vw_fPL(1,1,j),du2dz,k1F_z)
 
     do k = 1,Ngal(2,bandPL(myid))
       do i = 1,Ngal(1,bandPL(myid))
@@ -1895,6 +1952,10 @@ subroutine nonlinInter(jlist, x_cPL, uaPL, upPL)
       ka = kLkup(pn*iNeg(la)*jlist%list(l,2))
       kp = kLkup(pn*iNeg(lp)*jlist%list(l,4))
       kt = kLkup(pn*(jlist%list(l,2)+jlist%list(l,4)))
+
+      !write(6,*) "jlist%list(l,2)", jlist%list(l,2), "jlist%list(l,4)",  jlist%list(l,4), kLkup(0)
+
+       
       x_cPL(it,kt) = x_cPL(it,kt) + uaPL(ia,ka)*upPL(ip,kp) - iNeg(la)*iNeg(lp)*uaPL(ia+1,ka)*upPL(ip+1,kp) 
       x_cPL(it+1,kt) = x_cPL(it+1,kt) + iNeg(lp)*uaPL(ia,ka)*upPL(ip+1,kp) + iNeg(la)*uaPL(ia+1,ka)*upPL(ip,kp)
       ! x = uaPL(ia,ka)*upPL(ip,kp) - iNeg(la)*iNeg(lp)*uaPL(ia+1,ka)*upPL(ip+1,kp)
@@ -1904,6 +1965,8 @@ subroutine nonlinInter(jlist, x_cPL, uaPL, upPL)
       ! end if
     end do
   end do
+
+  ! write(6,*) "kLkup", kLkup(:)
 
   ! full convolution
 
@@ -2030,10 +2093,10 @@ subroutine ops_in_planes2(myid,flagst)
     !   ! write(11) wu_cPL(:,:,j)
     ! end if  
   
-    call der_x(uu_cPL(1,1,j),du1dx,k1F_x,bandPL(myid))
-    call der_z(uw_cPL(1,1,j),du1dz,k1F_z,bandPL(myid))
-    call der_x(uw_cPL(1,1,j),du3dx,k1F_x,bandPL(myid))
-    call der_z(ww_cPL(1,1,j),du3dz,k1F_z,bandPL(myid))
+    call der_x(uu_cPL(1,1,j),du1dx,k1F_x)
+    call der_z(uw_cPL(1,1,j),du1dz,k1F_z)
+    call der_x(uw_cPL(1,1,j),du3dx,k1F_x)
+    call der_z(ww_cPL(1,1,j),du3dz,k1F_z)
    
     do k = 1,Ngal(2,bandPL(myid))
       do i = 1,Ngal(1,bandPL(myid))
@@ -2101,8 +2164,8 @@ subroutine ops_in_planes2(myid,flagst)
     !   close(11)
     ! end if    
     
-    call der_x(uv_fPL(1,1,j),du2dx,k1F_x,bandPL(myid))
-    call der_z(wv_fPL(1,1,j),du2dz,k1F_z,bandPL(myid))
+    call der_x(uv_fPL(1,1,j),du2dx,k1F_x)
+    call der_z(wv_fPL(1,1,j),du2dz,k1F_z)
 
     do k = 1,Ngal(2,bandPL(myid))
       do i = 1,Ngal(1,bandPL(myid))
@@ -2207,9 +2270,12 @@ subroutine planes_to_modes_UVP (x,xPL,grid,myid,status,ierr)
   jminR = max(limPL_excw(grid,1,myid),jlim(1,grid)+1)  ! Select the planes to transpose 
   jmaxR = min(limPL_excw(grid,2,myid),jlim(2,grid)-1)
 
+  ! write(6,*) "jminR", limPL_excw(3,1,myid), jlim(1,3)+1
+
+
   !write(6,*) "interfaces"
 
-  if (jminR==Ny(grid,nband-1)+1 .and. jmaxR>=jminR) then   ! Special cases: interfaces
+  if (jminR==Ny(grid,0)+1 .and. jmaxR>=jminR) then   ! Special cases: interfaces
     jminR = jminR-1
   end if
   if (jmaxR==Ny(grid,nband  )   .and. jmaxR>=jminR) then
@@ -2217,6 +2283,8 @@ subroutine planes_to_modes_UVP (x,xPL,grid,myid,status,ierr)
   end if
 
   ! write(6,*) "acc transposing"
+
+  ! write(6,*) "jminR", jminR, "jmaxR", jmaxR
 
   do j = jminR,jmaxR
     do column = 1,columns_num(myid)
@@ -2796,7 +2864,7 @@ subroutine planes_to_modes_NUVP(x,xPL,grid,myid,status,ierr)
   integer column
   integer inode,yourid
   integer msizeR,msizeS
-  type(cfield) x  (sband:eband)
+  type(cfield) x
   real(8)      xPL(igal,kgal,jgal(grid,1):jgal(grid,2))
   complex(8), allocatable:: buffS(:,:),buffR(:,:)
 
@@ -2805,55 +2873,55 @@ subroutine planes_to_modes_NUVP(x,xPL,grid,myid,status,ierr)
   ! Loop for itself
   ! Transpose the cube that it already owns
   plband = bandPL(myid) ! Return the band (phys) the proc works at
-  do iband = sband,eband
-    jminR = max(limPL_excw(grid,1,myid),jlim(1,grid)+1)  ! Select the planes to transpose 
-    jmaxR = min(limPL_excw(grid,2,myid),jlim(2,grid)-1)
-    do j = jminR,jmaxR
-      do column = 1,columns_num(myid)
-        i = columns_i(column,myid)
-        k = columns_k(column,myid) - dk(column,myid)
-        x(iband)%f(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j)) ! Transposition: Reordering from XZY to YC
-      end do
+  ! do iband = sband,eband
+  jminR = max(limPL_excw(grid,1,myid),jlim(1,grid)+1)  ! Select the planes to transpose 
+  jmaxR = min(limPL_excw(grid,2,myid),jlim(2,grid)-1)
+  do j = jminR,jmaxR
+    do column = 1,columns_num(myid)
+      i = columns_i(column,myid)
+      k = columns_k(column,myid) - dk(column,myid)
+      x%f(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j)) ! Transposition: Reordering from XZY to YC
     end do
   end do
+  ! end do
 
   do inode = 1,pnodes-1
     yourid = ieor(myid,inode)   ! XOR. It's used to pair procs 1-to-1
     if (yourid<np) then
       !do iband=bandit(1),bandit(2),bandit(3)   ! Iterate first over the short pencils and then the long ones.
-      do iband = sband,eband
-        !jband = crossband(iband,yourid)
-        jband = iband
-        jminS = max(limPL_excw(grid,1,  myid),jlim(1,grid)+1)  ! Select the planes to be SENT.
-        jmaxS = min(limPL_excw(grid,2,  myid),jlim(2,grid)-1)  ! max and min because maybe this proc needs less planes that the other proc has
-        jminR = max(limPL_excw(grid,1,yourid),jlim(1,grid)+1)  ! Select the planes to be RECEIVED
-        jmaxR = min(limPL_excw(grid,2,yourid),jlim(2,grid)-1)
-        ! Special cases: interfaces
-        allocate(buffS(jminS:jmaxS,columns_num(yourid)))
-        allocate(buffR(jminR:jmaxR,columns_num(  myid)))
-        msizeS = 2*(columns_num(yourid)*(jmaxS-jminS+1))     ! Size of the data to be SENDER (times 2, because it is complex)
-        msizeR = 2*(columns_num(  myid)*(jmaxR-jminR+1))     ! Size of the data to be RECEIVED
-        msizeS = max(msizeS,0)                                     ! The size has to be 0 or positive. 
-        msizeR = max(msizeR,0)
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        do j=jminS,jmaxS
-          do column = 1,columns_num(yourid)
-            i = columns_i(column,yourid)
-            k = columns_k(column,yourid) - dk(column,yourid)
-            buffS(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j))     ! The data is transposed and stored in a buffer
-          end do
+      !do iband = sband,eband
+      !!jband = crossband(iband,yourid)
+      !jband = iband
+      jminS = max(limPL_excw(grid,1,  myid),jlim(1,grid)+1)  ! Select the planes to be SENT.
+      jmaxS = min(limPL_excw(grid,2,  myid),jlim(2,grid)-1)  ! max and min because maybe this proc needs less planes that the other proc has
+      jminR = max(limPL_excw(grid,1,yourid),jlim(1,grid)+1)  ! Select the planes to be RECEIVED
+      jmaxR = min(limPL_excw(grid,2,yourid),jlim(2,grid)-1)
+      ! Special cases: interfaces
+      allocate(buffS(jminS:jmaxS,columns_num(yourid)))
+      allocate(buffR(jminR:jmaxR,columns_num(  myid)))
+      msizeS = 2*(columns_num(yourid)*(jmaxS-jminS+1))     ! Size of the data to be SENDER (times 2, because it is complex)
+      msizeR = 2*(columns_num(  myid)*(jmaxR-jminR+1))     ! Size of the data to be RECEIVED
+      msizeS = max(msizeS,0)                                     ! The size has to be 0 or positive. 
+      msizeR = max(msizeR,0)
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      do j=jminS,jmaxS
+        do column = 1,columns_num(yourid)
+          i = columns_i(column,yourid)
+          k = columns_k(column,yourid) - dk(column,yourid)
+          buffS(j,column) = dcmplx(xPL(2*i+1,k,j),xPL(2*i+2,k,j))     ! The data is transposed and stored in a buffer
         end do
-        call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*iband+11*jband, &   ! SEND_RECV so it can send and receive at the same time
-&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*iband+7*jband, &
-&                         MPI_COMM_WORLD,status,ierr)
-        do j=jminR,jmaxR
-          do column = 1,columns_num(myid)
-            x(iband)%f(j,column) = buffR(j,column)                         ! Store the data received
-          end do
-        end do
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        deallocate(buffR,buffS)
       end do
+      call MPI_SENDRECV(buffS,msizeS,MPI_REAL8,yourid,77*yourid+53*myid+7*nband+11*nband, &   ! SEND_RECV so it can send and receive at the same time
+&                         buffR,msizeR,MPI_REAL8,yourid,53*yourid+77*myid+11*nband+7*nband, &
+&                         MPI_COMM_WORLD,status,ierr)
+      do j=jminR,jmaxR
+        do column = 1,columns_num(myid)
+          x%f(j,column) = buffR(j,column)                         ! Store the data received
+        end do
+      end do
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      deallocate(buffR,buffS)
+      !end do
     end if
   end do
 
@@ -2870,7 +2938,7 @@ subroutine record_out(u1,myid)
   include 'mpif.h'             ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid
 
-  type(cfield) u1(sband:eband)
+  type(cfield) u1
   integer nx,nz
   integer j,jmax,iproc
   real(8), allocatable:: buffSR(:,:)
@@ -2879,8 +2947,8 @@ subroutine record_out(u1,myid)
   real(8) Uslip  
 
   if (myid/=0) then
-    nx = N(1,bandPL(myid))+2
-    nz = N(2,bandPL(myid))
+    nx = N(1,nband)+2
+    nz = N(2,nband)
     allocate(buffSR(nx,nz))
     do j = limPL_incw(ugrid,1,myid),limPL_incw(ugrid,2,myid)
       call u_to_buff(buffSR,u1PL(1,1,j),nx,nz,igal,kgal)
@@ -2914,8 +2982,8 @@ subroutine record_out(u1,myid)
     write(10) t,Re,alp,bet,mpgx,nband,iter,dummint 
     write(10) N
     write(10) yu,dthetavi,dthdyu
-    nx = N(1,bandPL(myid))+2
-    nz = N(2,bandPL(myid))
+    nx = N(1,nband)+2
+    nz = N(2,nband)
     allocate(buffSR(nx,nz))
     do j = limPL_incw(ugrid,1,myid),limPL_incw(ugrid,2,myid)
        call u_to_buff(buffSR,u1PL(1,1,j),nx,nz,igal,kgal)
@@ -2923,8 +2991,8 @@ subroutine record_out(u1,myid)
     end do
     deallocate(buffSR)
     do iproc = 1,np-1
-      nx = N(1,bandPL(iproc))+2
-      nz = N(2,bandPL(iproc))
+      nx = N(1,nband)+2
+      nz = N(2,nband)
       allocate(buffSR(nx,nz))
       do j = limPL_incw(ugrid,1,iproc),limPL_incw(ugrid,2,iproc)
         call MPI_RECV(buffSR,nx*nz,MPI_REAL8,iproc,123*iproc,MPI_COMM_WORLD,status,ierr)
@@ -2939,8 +3007,8 @@ subroutine record_out(u1,myid)
     write(10) t,Re,alp,bet,mpgx,nband,iter,dummint
     write(10) N
     write(10) yv,dthetavi,dthdyv
-    nx = N(1,bandPL(myid))+2
-    nz = N(2,bandPL(myid))
+    nx = N(1,nband)+2
+    nz = N(2,nband)
     allocate(buffSR(nx,nz))
     do j = limPL_incw(vgrid,1,myid),limPL_incw(vgrid,2,myid)
       call u_to_buff(buffSR,u2PL(1,1,j),nx,nz,igal,kgal)
@@ -2948,8 +3016,8 @@ subroutine record_out(u1,myid)
     end do
     deallocate(buffSR)
     do iproc = 1,np-1
-      nx = N(1,bandPL(iproc))+2
-      nz = N(2,bandPL(iproc))
+      nx = N(1,nband)+2
+      nz = N(2,nband)
       allocate(buffSR(nx,nz))
       do j = limPL_incw(vgrid,1,iproc),limPL_incw(vgrid,2,iproc)
         call MPI_RECV(buffSR,nx*nz,MPI_REAL8,iproc,124*iproc,MPI_COMM_WORLD,status,ierr)
@@ -2964,8 +3032,8 @@ subroutine record_out(u1,myid)
     write(10) t,Re,alp,bet,mpgx,nband,iter,dummint
     write(10) N
     write(10) yu,dthetavi,dthdyu
-    nx = N(1,bandPL(myid))+2
-    nz = N(2,bandPL(myid))
+    nx = N(1,nband)+2
+    nz = N(2,nband)
     allocate(buffSR(nx,nz))
     do j = limPL_incw(ugrid,1,myid),limPL_incw(ugrid,2,myid)
       call u_to_buff(buffSR,u3PL(1,1,j),nx,nz,igal,kgal)
@@ -2973,8 +3041,8 @@ subroutine record_out(u1,myid)
     end do
     deallocate(buffSR)
     do iproc = 1,np-1
-      nx = N(1,bandPL(iproc))+2
-      nz = N(2,bandPL(iproc))
+      nx = N(1,nband)+2
+      nz = N(2,nband)
       allocate(buffSR(nx,nz))
       do j = limPL_incw(ugrid,1,iproc),limPL_incw(ugrid,2,iproc)
         call MPI_RECV(buffSR,nx*nz,MPI_REAL8,iproc,125*iproc,MPI_COMM_WORLD,status,ierr)
@@ -2989,8 +3057,8 @@ subroutine record_out(u1,myid)
     write(10) t,Re,alp,bet,mpgx,nband,iter,dummint
     write(10) N
     write(10) yu,dthetavi,dthdyu
-    nx = N(1,bandPL(myid))+2
-    nz = N(2,bandPL(myid))
+    nx = N(1,nband)+2
+    nz = N(2,nband)
     allocate(buffSR(nx,nz))
     do j = limPL_incw(pgrid,1,myid),limPL_incw(pgrid,2,myid)
       call u_to_buff(buffSR,ppPL(1,1,j),nx,nz,igal,kgal)
@@ -2998,8 +3066,8 @@ subroutine record_out(u1,myid)
     end do
     deallocate(buffSR)
     do iproc = 1,np-1
-      nx = N(1,bandPL(iproc))+2
-      nz = N(2,bandPL(iproc))
+      nx = N(1,nband)+2
+      nz = N(2,nband)
       allocate(buffSR(nx,nz))
       do j = limPL_incw(pgrid,1,iproc),limPL_incw(pgrid,2,iproc)
         call MPI_RECV(buffSR,nx*nz,MPI_REAL8,iproc,126*iproc,MPI_COMM_WORLD,status,ierr)
@@ -3039,10 +3107,10 @@ subroutine record_out(u1,myid)
 
   if (myid==0) then
 
-    Uslip = ((u1(2)%f(1,1))*(-1d0-yu(0))+(u1(2)%f(0,1))*(yu(1)+1d0))/(yu(1)-yu(0))
+    Uslip = ((u1%f(1,1))*(-1d0-yu(0))+(u1%f(0,1))*(yu(1)+1d0))/(yu(1)-yu(0))
 
-    call flowrateIm(Qx,u1(midband)%f(N(4,0),1))
-    call maxvel(u1(midband)%f(N(4,0),1))
+    call flowrateIm(Qx,u1%f(N(4,0),1))
+    call maxvel(u1%f(N(4,0),1))
     write(*,*) ''
     write(*,*) 'iter',iter
     write(*,*) 't   ',t
