@@ -681,6 +681,8 @@ end if
   ! allocate(du1dy_columns(sband:eband))
   ! allocate(du2dy_columns(sband:eband))
   ! allocate(du3dy_columns(sband:eband))
+
+  
   
   ! do iband = sband,eband
   !   allocate( u1_itp      (iband)%f   (  jlim(1,vgrid)  :jlim(2,vgrid)  ,columns_num(myid)))
@@ -2537,6 +2539,7 @@ subroutine proc_lims_columns(myid)
   accum = 0
   do iproc = 0,np-1
     ! write(6,*) "iproc", iproc
+    ! write(6,*) "columns_num", columns_num(iproc), iproc
     do column = 1,columns_num(iproc)
       columns_i(column,iproc) = columns_total_list_i(column + accum)
       columns_k(column,iproc) = columns_total_list_k(column + accum)
@@ -2606,8 +2609,9 @@ subroutine proc_lims_columns(myid)
   dk_phys = 0
   do iproc = 0,np-1
         do column = 1,columns_num(iproc)
-          if (columns_k(column,iproc) > N(2,1)/2) then
-            dk_phys(column,iproc) = N(2,1)-N(2,nband)
+          if (columns_k(column,iproc) > N(2,nband)/2) then
+            dk_phys(column,iproc) = N(2,nband)-N(2,nband)
+            ! write(6,*) "meow"
           end if
     end do
   end do
@@ -2996,7 +3000,7 @@ subroutine proc_lims_planes(myid)
   allocate(limPL_excw(3,2,0:np-1))
   allocate(limPL_FFT(3,2,0:np-1))
   allocate(bandPL(0:np-1))
-  allocate(bandPL_FFT(0:np-1))
+  ! allocate(bandPL_FFT(0:np-1))
 
   jlow = N(4,0) + 1
   jupp = N(4,nband)
@@ -3145,45 +3149,45 @@ subroutine proc_lims_planes(myid)
   
 
   
-  ! For FFT planes
+  ! ! For FFT planes
 
 
-  !! COPIED FROM OLD CODE - IDK WHY WE HAVE THIS OR WHAT IT IS 
-  ! Bottom band
-  proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid)+1)/(np/2))
-  rem_planes = (physlim_bot-jlim(1,ugrid)+1)-(np/2)*proc_planes
-  iplanes = jlim(1,ugrid)-1
+  ! !! COPIED FROM OLD CODE - IDK WHY WE HAVE THIS OR WHAT IT IS 
+  ! ! Bottom band
+  ! proc_planes = floor(1d0*(physlim_bot-jlim(1,ugrid)+1)/(np/2))
+  ! rem_planes = (physlim_bot-jlim(1,ugrid)+1)-(np/2)*proc_planes
+  ! iplanes = jlim(1,ugrid)-1
 
-    do iproc = 0,np/2-1
-      limPL_FFT(:,1,iproc) = iplanes + 1
+  !   do iproc = 0,np/2-1
+  !     limPL_FFT(:,1,iproc) = iplanes + 1
       
-      if(iproc<rem_planes)then
-        iplanes = iplanes + proc_planes + 1
-      else
-        iplanes = iplanes + proc_planes
-      endif
-      limPL_FFT(:,2,iproc) = iplanes
-      bandPL_FFT(iproc)=1
-    enddo
+  !     if(iproc<rem_planes)then
+  !       iplanes = iplanes + proc_planes + 1
+  !     else
+  !       iplanes = iplanes + proc_planes
+  !     endif
+  !     limPL_FFT(:,2,iproc) = iplanes
+  !     bandPL_FFT(iproc)=1
+  !   enddo
 
-  !Top band
-  proc_planes = floor(1d0*(jlim(2,ugrid)-physlim_top+1)/(np/2))
-  rem_planes = (jlim(2,ugrid)-physlim_top+1)-(np/2)*proc_planes
-  iplanes = physlim_top-1
+  ! !Top band
+  ! proc_planes = floor(1d0*(jlim(2,ugrid)-physlim_top+1)/(np/2))
+  ! rem_planes = (jlim(2,ugrid)-physlim_top+1)-(np/2)*proc_planes
+  ! iplanes = physlim_top-1
 
-    do iproc = np/2,np-1
-      limPL_FFT(:,1,iproc) = iplanes + 1
+  !   do iproc = np/2,np-1
+  !     limPL_FFT(:,1,iproc) = iplanes + 1
       
-      if(iproc-np/2<rem_planes)then
-        iplanes = iplanes + proc_planes + 1
-      else
-        iplanes = iplanes + proc_planes
-      endif
-      limPL_FFT(:,2,iproc) = iplanes
-      bandPL_FFT(iproc)=3
-    enddo
+  !     if(iproc-np/2<rem_planes)then
+  !       iplanes = iplanes + proc_planes + 1
+  !     else
+  !       iplanes = iplanes + proc_planes
+  !     endif
+  !     limPL_FFT(:,2,iproc) = iplanes
+  !     bandPL_FFT(iproc)=3
+  !   enddo
     
-    limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
+  !   limPL_FFT(vgrid,2,np-1)=limPL_FFT(ugrid,2,np-1)-1
 
 
 
@@ -3570,7 +3574,7 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
     stop
   end if
 
-  !write(6,*) "check1 ", myid
+  write(6,*) "check1 ", myid
 
   ! Broadcast the time step and time.
   ! If it's initialized from a previous simulation this value is already known, otherwise it's set to 0
@@ -3581,14 +3585,14 @@ subroutine getini(u1,u2,u3,p,div,myid,status,ierr)
   iwrite = iter
 
   ! 'Probably' this is used to initialize the divergence in the case of a new simulation
-  ! write(6,*) "call divergence ", myid
+   write(6,*) "call divergence ", myid
   call divergence(div%f,u1%f,u2%f,u3%f,myid)
 
-  ! write(6,*) "call init stats", myid
+   write(6,*) "call init stats", myid
   call init_stats(myid)
-  ! write(6,*) "finished init_stats", myid
+   write(6,*) "finished init_stats", myid
   
-  !write(6,*) "call init_sl stats", myid
+  write(6,*) "call init_sl stats", myid
   call init_sl_stats(myid)
 
   if (myid==0) then
@@ -3750,7 +3754,7 @@ subroutine mblock_ini(u1,u2,u3,p,myid,status,ierr)
   u3%f = 0d0
   p%f = 0d0
 
-
+  write(6,*) " Calling read in"
   call read_in(myid)
    
   ! write(6,*) " start pplanes to modes"
@@ -4182,12 +4186,12 @@ subroutine read_in(myid)
     allocate(nxxu(N2(4,0):N2(4,nband)+1),nzzu(N2(4,0):N2(4,nband)+1))
     allocate(nxxv(N2(3,0):N2(3,nband)+1),nzzv(N2(3,0):N2(3,nband)+1))
     allocate(nxxp(N2(4,0)+1:N2(4,nband)+1-1),nzzp(N2(4,0)+1:N2(4,nband)+1-1))
-    nxxu(N2(4,0))=N2(1,1)+2
-    nzzu(N2(4,0))=N2(2,1)
-    nxxv(N2(3,0))=N2(1,1)+2
-    nzzv(N2(3,0))=N2(2,1)
-    nxxp(N2(4,0)+1)=N2(1,1)+2
-    nzzp(N2(4,0)+1)=N2(2,1)
+    nxxu(N2(4,0))=N2(1,nband)+2
+    nzzu(N2(4,0))=N2(2,nband)
+    nxxv(N2(3,0))=N2(1,nband)+2
+    nzzv(N2(3,0))=N2(2,nband)
+    nxxp(N2(4,0)+1)=N2(1,nband)+2
+    nzzp(N2(4,0)+1)=N2(2,nband)
     ! do iband=1,nband
     do j=N2(4,0)+1,N2(4,nband)
       nxxu(j)=N2(1,nband)+2
@@ -4430,20 +4434,20 @@ subroutine read_in(myid)
     call MPI_RECV(N2,4*(nband+2),MPI_INTEGER,0,121*myid,MPI_COMM_WORLD,status,ierr)
     allocate(nxxu(N2(4,0):N2(4,nband)+1),nzzu(N2(4,0):N2(4,nband)+1))
     allocate(nxxv(N2(3,0):N2(3,nband)+1),nzzv(N2(3,0):N2(3,nband)+1))
-    nxxu(N2(4,0))=N2(1,1)+2
-    nzzu(N2(4,0))=N2(2,1)
-    nxxv(N2(3,0))=N2(1,1)+2
-    nzzv(N2(3,0))=N2(2,1)
-    do iband=1,nband
-      do j=N2(4,iband-1)+1,N2(4,iband)
-        nxxu(j)=N2(1,iband)+2
-        nzzu(j)=N2(2,iband)
-      end do
-      do j=N2(3,iband-1)+1,N2(3,iband)
-        nxxv(j)=N2(1,iband)+2
-        nzzv(j)=N2(2,iband)
-      end do
+    nxxu(N2(4,0))=N2(1,nband)+2
+    nzzu(N2(4,0))=N2(2,nband)
+    nxxv(N2(3,0))=N2(1,nband)+2
+    nzzv(N2(3,0))=N2(2,nband)
+    ! do iband=1,nband
+    do j=N2(4,0)+1,N2(4,nband)
+      nxxu(j)=N2(1,nband)+2
+      nzzu(j)=N2(2,nband)
     end do
+    do j=N2(3,0)+1,N2(3,nband)
+      nxxv(j)=N2(1,nband)+2
+      nzzv(j)=N2(2,nband)
+    end do
+    ! end do
     nxxu(N2(4,nband)+1)=N2(1,nband)+2
     nzzu(N2(4,nband)+1)=N2(2,nband)
     nxxv(N2(3,nband)+1)=N2(1,nband)+2

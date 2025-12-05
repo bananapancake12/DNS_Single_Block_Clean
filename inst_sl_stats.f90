@@ -5,15 +5,15 @@ subroutine inst_sl_stats(u1,u3,myid,status,ierr)
 
   include 'mpif.h'             ! MPI variables
   integer      :: status(MPI_STATUS_SIZE),ierr,myid
-  type(cfield) :: u1(sband:eband),u3(sband:eband)
+  type(cfield) :: u1,u3
   
   integer :: i,k,kk,j,column,iband
   integer, allocatable :: dummint(:)
   
-  !real(8) :: xreal(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
+  !real(8) :: xreal(N(1,nband)+2,N(2,nband))
 
   real(8),pointer :: xreal(:,:)
-  allocate(xreal(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
+  allocate(xreal(N(1,nband)+2,N(2,nband)))
 
   
    if (myid==0) then
@@ -24,16 +24,16 @@ subroutine inst_sl_stats(u1,u3,myid,status,ierr)
   !do iband=1,2
     do column = 1,columns_num(myid)
       j = jlim(1,vgrid)
-      du1dy_columns%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=(u1%f(j+1,column)-u1%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=(u3%f(j+1,column)-u3%f(j,column))*dthdyv(j)*ddthetavi
     enddo
   !enddo
   
   !do iband=2,3
     do column = 1,columns_num(myid)
       j = jlim(2,vgrid)
-      du1dy_columns%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
+      du1dy_columns%f(j,column)=-(u1%f(j+1,column)-u1%f(j,column))*dthdyv(j)*ddthetavi
+      du3dy_columns%f(j,column)=-(u3%f(j+1,column)-u3%f(j,column))*dthdyv(j)*ddthetavi
     enddo
   !enddo
 
@@ -42,21 +42,21 @@ subroutine inst_sl_stats(u1,u3,myid,status,ierr)
   u1_f_PL = 0d0
   u3_f_PL = 0d0
 
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
   
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
   
   if(myid==np-1)then !send
-    call MPI_SEND(u1_f_PL(1,1,jlim(2,vgrid)),(N(1,bandPL(myid))+2)*N(2,bandPL(myid))   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(du1dy_PL(1,1,jlim(2,vgrid)),(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(u3_f_PL(1,1,jlim(2,vgrid)),(N(1,bandPL(myid))+2)*N(2,bandPL(myid))   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(du3dy_PL(1,1,jlim(2,vgrid)),(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(u1_f_PL(1,1,jlim(2,vgrid)),(N(1,nband)+2)*N(2,nband)   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(du1dy_PL(1,1,jlim(2,vgrid)),(N(1,nband)+2)*N(2,nband),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(u3_f_PL(1,1,jlim(2,vgrid)),(N(1,nband)+2)*N(2,nband)   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(du3dy_PL(1,1,jlim(2,vgrid)),(N(1,nband)+2)*N(2,nband),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
 
   elseif(myid==0)then !recieve
     write(ext4,'(i5.5)') int(10d0*t)!int(t)!
@@ -94,11 +94,11 @@ subroutine recvbreal_inst(xread,xlocal,myid,status,ierr)
 
   integer j,iproc,myid
   integer msize
-  real(8) xread(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  real(8) xlocal(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
+  real(8) xread(N(1,nband)+2,N(2,nband))
+  real(8) xlocal(N(1,nband)+2,N(2,nband))
 
   
-  call MPI_RECV(xread,(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
+  call MPI_RECV(xread,(N(1,nband)+2)*N(2,nband),MPI_REAL8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
 
   write(10) xlocal
   write(10) xread

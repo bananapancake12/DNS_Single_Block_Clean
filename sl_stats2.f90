@@ -41,7 +41,7 @@ subroutine sl_stats(u1,u3,myid,status,ierr)
 
   include 'mpif.h'             ! MPI variables
   integer      :: status(MPI_STATUS_SIZE),ierr,myid
-  type(cfield) :: u1(sband:eband),u3(sband:eband)
+  type(cfield) :: u1,u3
   
   integer :: i,k,kk,j,column,iband
   
@@ -72,43 +72,43 @@ subroutine sl_stats(u1,u3,myid,status,ierr)
   !allocate(bslip_u3_f_bot(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
   !allocate(bslip_u3_f_top(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
   
-  allocate(u1_f   (N(1,bandPL(myid))/2+1,N(2,bandPL(myid))))
-  allocate(du1dy_f(N(1,bandPL(myid))/2+1,N(2,bandPL(myid))))
-  allocate(u3_f   (N(1,bandPL(myid))/2+1,N(2,bandPL(myid))))
-  allocate(du3dy_f(N(1,bandPL(myid))/2+1,N(2,bandPL(myid))))
+  allocate(u1_f   (N(1,nband)/2+1,N(2,nband)))
+  allocate(du1dy_f(N(1,nband)/2+1,N(2,nband)))
+  allocate(u3_f   (N(1,nband)/2+1,N(2,nband)))
+  allocate(du3dy_f(N(1,nband)/2+1,N(2,nband)))
 
 istat_sl=istat_sl+1
   
-  do iband=1,2
-    do column = 1,columns_num(myid)
-      j = jlim(1,vgrid)
-      du1dy_columns%f(j,column)=(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns%f(j,column)=(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
-    enddo
+  ! do iband=1,2
+  do column = 1,columns_num(myid)
+    j = jlim(1,vgrid)
+    du1dy_columns%f(j,column)=(u1%f(j+1,column)-u1%f(j,column))*dthdyv(j)*ddthetavi
+    du3dy_columns%f(j,column)=(u3%f(j+1,column)-u3%f(j,column))*dthdyv(j)*ddthetavi
   enddo
+  ! enddo
   
-  do iband=2,3
-    do column = 1,columns_num(myid)
-      j = jlim(2,vgrid)
-      du1dy_columns%f(j,column)=-(u1(iband)%f(j+1,column)-u1(iband)%f(j,column))*dthdyv(j)*ddthetavi
-      du3dy_columns%f(j,column)=-(u3(iband)%f(j+1,column)-u3(iband)%f(j,column))*dthdyv(j)*ddthetavi
-    enddo
+  ! do iband=2,3
+  do column = 1,columns_num(myid)
+    j = jlim(2,vgrid)
+    du1dy_columns%f(j,column)=-(u1%f(j+1,column)-u1%f(j,column))*dthdyv(j)*ddthetavi
+    du3dy_columns%f(j,column)=-(u3%f(j+1,column)-u3%f(j,column))*dthdyv(j)*ddthetavi
   enddo
+  ! enddo
   
   du1dy_PL = 0d0
   du3dy_PL = 0d0
   u1_f_PL = 0d0
   u3_f_PL = 0d0
   
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
   
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,bandPL(myid),status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
   
     
   if(myid==0)then
@@ -117,8 +117,8 @@ istat_sl=istat_sl+1
  
     
   
-  do i = 1,N(1,bandPL(myid))+2
-      do k = 1,N(2,bandPL(myid))
+  do i = 1,N(1,nband)+2
+      do k = 1,N(2,nband)
 
         bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(1,vgrid))
         bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(1,vgrid))
@@ -135,8 +135,8 @@ istat_sl=istat_sl+1
  
     
   
-  do i = 1,N(1,bandPL(myid))+2
-      do k = 1,N(2,bandPL(myid))
+  do i = 1,N(1,nband)+2
+      do k = 1,N(2,nband)
 
         bslip_u1_M(i,k)    = bslip_u1_M(i,k) + u1_f_PL(i,k,jlim(2,vgrid))
         bslip_du1dy_M(i,k) = bslip_du1dy_M(i,k) + du1dy_PL(i,k,jlim(2,vgrid))

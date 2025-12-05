@@ -1141,7 +1141,7 @@ subroutine modes_to_planes_phys (xPL,x,grid,myid,status,ierr)
       k = columns_k(column,yourid) - dk_phys(column,yourid)
 
 
-      write(6,*) "k", k
+      ! write(6,*) "k", k, "columns_k",columns_k(column,yourid), "dk_phys", dk_phys(column,yourid), yourid
 
 
       xPL(2*i+1,k,j) = dreal(x%f(j,column))
@@ -3036,7 +3036,7 @@ subroutine record_out(u1,myid)
 !     end do
     deallocate(buffSR)
   else
-    write(ext4,'(i5.5)') int(10d0*(t))!int(t)!
+    write(ext4,'(i5.5)') int(10000d0*(t))!int(t)!
     allocate(dummint(88))
     dummint = 0
     !!!!!!!!!!!!!    u1    !!!!!!!!!!!!!
@@ -3228,7 +3228,7 @@ subroutine write_Qcrit(myid)
       call MPI_SEND(Qcrit(:,:,j),nx*nz,MPI_REAL8,0,127*myid,MPI_COMM_WORLD,ierr)
     end do
   else
-    write(ext4,'(i5.5)') int(10d0*t)!int(t)!
+    write(ext4,'(i5.5)') int(10000d0*t)!int(t)!
     allocate(dummint(88))
     dummint = 0
     !!!!!!!!!!!!!    Qcrit    !!!!!!!!!!!!!

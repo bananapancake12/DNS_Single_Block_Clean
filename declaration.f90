@@ -38,7 +38,6 @@ module declaration
   ! integer,pointer:: columns_num(:,:)
   ! integer,pointer:: dk_phys(:,:,:,:)
 
-  !! new allocations without bands!!
   integer, allocatable :: columns_num(:)
   integer, allocatable :: columns_i(:,:)
   integer, allocatable :: columns_k(:,:)
@@ -47,7 +46,6 @@ module declaration
   integer, allocatable :: dk_phys(:,:)
 
   integer, allocatable :: weight(:)
-
   
   
   integer,pointer:: planeBC(:,:)
@@ -86,15 +84,10 @@ module declaration
   real(8),pointer:: yv(:),dyv2i(:,:),dthdyv(:)
   real(8) dtheta,dthetai
   real(8) dthetavi,ddthetavi
-  !real(8),pointer:: gridweighting(:,:)
-  !real(8),pointer:: gridweighting_interp(:,:)
+  real(8),pointer:: gridweighting(:)
+  real(8),pointer:: gridweighting_interp(:)
   integer ppp
   real(8) dyq
-
-  real(8),allocatable :: gridweighting(:)
-  real(8), allocatable :: gridweighting_interp(:)
-
-
 
   ! Variables in planes
   real(8),pointer::  u1PL(:,:,:), u2PL(:,:,:), u3PL(:,:,:)
@@ -163,6 +156,11 @@ module declaration
     real(8),pointer:: b(:)
   end type array
 
+  type rfield
+    real(8),pointer:: fr(:,:)
+  end type rfield
+
+
   ! type(array), pointer:: buffR_x(:)
   ! type(array), pointer:: buffRal_x(:)
   ! type(array), pointer:: buffC_z(:)
@@ -177,15 +175,13 @@ module declaration
   
   
   ! type(cfield), allocatable:: u1_itp(:),u2_itp(:),u3_itp(:)
+  type(cfield) :: u1_itp,u2_itp,u3_itp
+  
   ! type(cfield), allocatable:: Nu1_dy(:),Nu2_dy(:),Nu3_dy(:)
+  type(cfield) :: Nu1_dy,Nu2_dy,Nu3_dy
+
   ! type(cfield), allocatable:: uv_f(:), wv_f(:), vv_c(:)
-
-
-
-  type(cfield)   :: u1_itp, u2_itp, u3_itp
-  type(cfield)   :: Nu1_dy, Nu2_dy, Nu3_dy
-  type(cfield)   :: uv_f, wv_f, vv_c
-
+  type(cfield) :: uv_f, wv_f, vv_c
 
   
   ! Omega x
@@ -197,15 +193,11 @@ module declaration
   real(8),      allocatable :: du2dy_planes2(:,:,:)
   real(8),      allocatable :: du3dy_planes2(:,:,:)
   
-  ! type(cfield), allocatable :: du1dy_columns(:)
-  ! type(cfield), allocatable :: du2dy_columns(:)
-  ! type(cfield), allocatable :: gridweighting_interp(:)
-
-  type(cfield)   :: du1dy_columns, du2dy_columns, du3dy_columns
+  type(cfield)  :: du1dy_columns
+  type(cfield)  :: du2dy_columns
+  type(cfield)  :: du3dy_columns
   
-  ! type(rfield_dg), allocatable:: DG(:)
-  
-  type(rfield_dg):: DG
+  type(rfield_dg) :: DG
   
   real(8) bslip
   

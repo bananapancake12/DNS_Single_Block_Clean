@@ -103,6 +103,8 @@ program littleharsh
   type(cfield) :: Nu1, Nu2, Nu3
   type(cfield) :: du1, du2, du3
 
+  type(rfield), allocatable :: a(:)
+
   
   real(8):: z,sigmaz
   integer column,i,k,j
@@ -126,6 +128,10 @@ program littleharsh
   ! Initialise
   call start(myid,status,ierr)
 
+  if(myid==0) then
+    write(6,*) "=====> Finished Start"
+  end if
+
 itersl=iter0
 nstatsl = nwrite
   
@@ -138,16 +144,18 @@ nstatsl = nwrite
   ! allocate( div(sband:eband))
 
 
+
+
   ! do iband = sband,eband
-  !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
+  !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
   !   allocate( u2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
-  !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
+  !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
+  !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
   !   allocate(du2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
-  !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid,iband)-1,columns_num(iband,myid)))
+  !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
+  !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
   !   allocate(Nu2  (iband)%f(jlim(1,vgrid,iband)+1:jlim(2,vgrid,iband)-1,columns_num(iband,myid)))
-  !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid,iband)-1,columns_num(iband,myid)))
+  !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
   !   allocate( p   (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
   !   allocate( psi (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
   !   allocate( div (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
@@ -169,6 +177,11 @@ nstatsl = nwrite
   allocate( psi%f( jlim(1,pgrid)      : jlim(2,pgrid),      columns_num(myid) ) )
   allocate( div%f( jlim(1,pgrid)      : jlim(2,pgrid),      columns_num(myid) ) )
 
+  allocate( a  (2))
+
+  allocate( a(ugrid)%fr(3,jlim(1,ugrid):jlim(2,ugrid)) )
+  allocate( a(vgrid)%fr(3,jlim(1,vgrid):jlim(2,vgrid)) )
+
   u1%f  = 0d0
   u2%f  = 0d0
   u3%f  = 0d0
@@ -181,11 +194,19 @@ nstatsl = nwrite
   p%f   = 0d0
   psi%f = 0d0
   div%f = 0d0
+  a(ugrid)%fr = 0d0
+  a(vgrid)%fr = 0d0
+
+
+
+  if(myid==0) then
+    write(6,*) "=====> Calling getini "
+  end if
 
 
   ! Get the initial conditions
   call getini(u1,u2,u3,p,div,myid,status,ierr)
-  ! write(*,*) 'finished getini', myid
+  write(6,*) 'finished getini', myid
 
 nextqt = floor(t*10d0)/10d0+0.1d0
 !write(*,*) 'nextqt'
@@ -199,7 +220,7 @@ nextqt = floor(t*10d0)/10d0+0.1d0
 
   ! MAIN LOOP 
   !do while (t<maxt) ! This is the original condition
-  do while (t<maxt .AND. iter < 5)
+  do while (t<maxt .AND. iter <5)
     ! Runge-Kutta substeps
     do kRK = 1,3
       ! Build     linear terms of right-hand-side of Navier-Stokes equation
@@ -219,9 +240,12 @@ nextqt = floor(t*10d0)/10d0+0.1d0
       end if 
 
       ! Resolve the matricial system
-      call solveU(u1,du1,1,myid)
-      call solveV(u2,du2,2,myid)
-      call solveU(u3,du3,3,myid)
+      ! call solveU(u1,du1,1,myid)
+      ! call solveV(u2,du2,2,myid)
+      ! call solveU(u3,du3,3,myid)
+
+      call solveU_W(u1,du1,u3,du3,a,myid)
+      call solveV(u2,du2,a,myid)
 
       if(myid==0) then
         write(6,*) "Finished Solving Velocities =====> Solving Pressure "
@@ -311,15 +335,15 @@ end program
 !   allocate( psi(sband:eband))
 !   allocate( div(sband:eband))
 !   ! do iband = sband,eband
-!   !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
+!   !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
 !   !   allocate( u2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
+!   !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
+!   !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
 !   !   allocate(du2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid,iband)-1,columns_num(iband,myid)))
+!   !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
+!   !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
 !   !   allocate(Nu2  (iband)%f(jlim(1,vgrid,iband)+1:jlim(2,vgrid,iband)-1,columns_num(iband,myid)))
-!   !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid,iband)-1,columns_num(iband,myid)))
+!   !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
 !   !   allocate( p   (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
 !   !   allocate( psi (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
 !   !   allocate( div (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
@@ -441,9 +465,9 @@ subroutine divergence(div,u1,u2,u3,myid)
 
   integer i,k,j,myid,column
   ! complex(8) div(jlim(1,pgrid,iband):jlim(2,pgrid,iband),columns_num(iband,myid))
-  ! complex(8)  u1(jlim(1,ugrid):jlim(2,ugrid,iband),columns_num(iband,myid))
+  ! complex(8)  u1(jlim(1,ugrid):jlim(2,ugrid),columns_num(iband,myid))
   ! complex(8)  u2(jlim(1,vgrid,iband):jlim(2,vgrid,iband),columns_num(iband,myid))
-  ! complex(8)  u3(jlim(1,ugrid):jlim(2,ugrid,iband),columns_num(iband,myid))
+  ! complex(8)  u3(jlim(1,ugrid):jlim(2,ugrid),columns_num(iband,myid))
 
   complex(8)  div( jlim(1,pgrid) : jlim(2,pgrid), columns_num(myid) )
   complex(8)   u1( jlim(1,ugrid) : jlim(2,ugrid), columns_num(myid) )
@@ -580,12 +604,23 @@ subroutine error(A,myid,ierr)
     do j = jlim(1,pgrid),jlim(2,pgrid)
       err     = abs(A%f(j,column))
       errband = max(errband,err)
+
+      ! write(6,*) "errband", errband
     end do
   end do
   erri = max(erri,errband)
   ! end do
 
+  !if (myid == 0) then
+  ! write(6,*) 'error(): size(A%f,1:2)=', size(A%f,1), size(A%f,2)
+  ! write(6,*) 'error(): jlim(1:2,pgrid)=', jlim(1,pgrid), jlim(2,pgrid)
+  ! write(6,*) 'error(): columns_num(myid)=', columns_num(myid), ' myid=', myid
+  !end if
+
+
   call MPI_ALLREDUCE(erri,err,1,MPI_REAL8,MPI_MAX,MPI_COMM_WORLD,ierr)
+
+
 
 end subroutine
 
@@ -606,7 +641,7 @@ subroutine finalize(u1,u2,u3,p,div,myid,status,ierr)
   type(cfield)   p, div
 
   iwrite = iwrite+nwrite
-  call error(div,ierr)
+  call error(div,myid,ierr)
 
   u1PL = 0d0
   u2PL = 0d0
@@ -830,7 +865,7 @@ subroutine solveP(p,psi,u1,u2,u3,div,myid)
 ! For modified wavenumbers, need BC on last pressure mode (as k2x=k2z=0)
 ! do column = 1,columns_num(iband,myid)
 ! i = columns_i(column,iband,myid)
-! k = columns_k(column,iband,myid)
+! k = columns_k(column,myid)
 ! if(abs(k1F_x(i)*k1F_x(i))<10e-10.and.abs(k1F_z(k)*k1F_z(k))<10e-10)then
 ! psi(iband)%f(jlim(1,pgrid,iband),column) = 0d0
 ! endif
@@ -1012,6 +1047,46 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
 
 end subroutine
 
+
+subroutine solveU_W(u,du,w,dw,a,myid) !pass (u,du,w,dw)
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   use declaration
+   implicit none
+
+   integer i,k,j,iband,column,myid
+   type(cfield)  u
+   type(cfield)  w
+   type(cfield) du
+   type(cfield) dw
+   type(rfield) a(2)
+
+   ! do iband = sband,eband
+    do column = 1,columns_num(myid)
+        i = columns_i(column,myid)
+        k = columns_k(column,myid)
+        du%f(jlim(1,ugrid),column) = 0d0
+        dw%f(jlim(1,ugrid),column) = 0d0
+
+        do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+          du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
+          dw%f(j,column) = w%f(j,column)+dt*(dw%f(j,column)) !For solving for w
+        end do
+
+        du%f(jlim(2,ugrid),column) = 0d0
+        dw%f(jlim(2,ugrid),column) = 0d0
+    end do
+   ! end do
+
+   ! call immersed_boundaries_U_W(u,du,w,dw,ugrid,myid)
+
+   ! do iband = sband,eband
+    call LUsolU_W(u,du,w,dw,a(ugrid)%fr(1:3,jlim(1,ugrid):jlim(2,ugrid)),ugrid,myid)
+   ! end do
+end subroutine
+
 subroutine solveU(u,du,ufield,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
@@ -1030,7 +1105,7 @@ subroutine solveU(u,du,ufield,myid)
     k = columns_k(column,myid)
     du%f(jlim(1,ugrid),column) = 0d0
     do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-!         du(iband)%f(j,column) = dt*(du(iband)%f(j,column)) !For solving for du
+!         du%f(j,column) = dt*(du%f(j,column)) !For solving for du
       du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
     end do
     du%f(jlim(2,ugrid),column) = 0d0
@@ -1041,9 +1116,9 @@ subroutine solveU(u,du,ufield,myid)
 !call LUsolV(du,ugrid,myid) !Can use for smooth channel
 
 !   do iband = sband,eband
-!     do column = 1,columns_num(iband,myid)
-!       do j = jlim(1,ugrid),jlim(2,ugrid,iband)
-!         u(iband)%f(j,column) = u(iband)%f(j,column)+du(iband)%f(j,column) !For solving for du
+!     do column = 1,columns_num(myid)
+!       do j = jlim(1,ugrid),jlim(2,ugrid)
+!         u%f(j,column) = u%f(j,column)+du%f(j,column) !For solving for du
 !       enddo
 !     enddo
 !   end do
@@ -1058,50 +1133,85 @@ subroutine solveU(u,du,ufield,myid)
 
 end subroutine
 
-subroutine solveV(u,du,ufield,myid)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+subroutine solveV(u,du,a,myid)
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
-  use declaration
-  implicit none
-  integer i,k,j,column,myid,ufield
-  type(cfield)  u
-  type(cfield) du
+   use declaration
+   implicit none
+   integer i,k,j,iband,column,myid
+   type(cfield)  u
+   type(cfield) du
+   type(rfield) a(2)
 
-
-  ! do iband = sband,eband
-  do column = 1,columns_num(myid)
-    i = columns_i(column,myid)
-    k = columns_k(column,myid)
-    du%f(jlim(1,vgrid),column) = 0d0
-    do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
-!         du(iband)%f(j,column) = dt*(du(iband)%f(j,column)) !For solving for du
-      du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
+   ! do iband = sband,eband
+    do column = 1,columns_num(myid)
+        i = columns_i(column,myid)
+        k = columns_k(column,myid)
+        du%f(jlim(1,vgrid),column) = 0d0
+        do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
+          !         du%f(j,column) = dt*(du%f(j,column)) !For solving for du
+          du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
+        end do
+        du%f(jlim(2,vgrid),column) = 0d0
     end do
-    du%f(jlim(2,vgrid),column) = 0d0
-  end do
-  ! end do
+   ! end do
 
-  call LUsolV(du,vgrid,ufield,myid)
-
-!   do iband = sband,eband
-!     do column = 1,columns_num(iband,myid)
-!       do j = jlim(1,vgrid,iband),jlim(2,vgrid,iband)
-!         u(iband)%f(j,column) = u(iband)%f(j,column)+du(iband)%f(j,column) !For solving for du
-!       enddo
-!     enddo
-!   end do
-
-  ! do iband = sband,eband
-  do column = 1,columns_num(myid)
-    do j = jlim(1,vgrid),jlim(2,vgrid)
-      u%f(j,column) = du%f(j,column) !For solving for u
-    enddo
-  enddo
-  ! end do
-
+   ! call immersed_boundaries_V(u,du,vgrid,myid)
+   
+   ! do iband = sband,eband
+    call LUsolV(u,du,a(vgrid)%fr(1:3,jlim(1,vgrid):jlim(2,vgrid)),vgrid,myid)
+   !end do
 end subroutine
+
+
+! subroutine solveV(u,du,ufield,myid)
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+!   use declaration
+!   implicit none
+!   integer i,k,j,column,myid,ufield
+!   type(cfield)  u
+!   type(cfield) du
+
+
+!   ! do iband = sband,eband
+!   do column = 1,columns_num(myid)
+!     i = columns_i(column,myid)
+!     k = columns_k(column,myid)
+!     du%f(jlim(1,vgrid),column) = 0d0
+!     do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
+! !         du(iband)%f(j,column) = dt*(du(iband)%f(j,column)) !For solving for du
+!       du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
+!     end do
+!     du%f(jlim(2,vgrid),column) = 0d0
+!   end do
+!   ! end do
+
+!   call LUsolV(du,vgrid,ufield,myid)
+
+! !   do iband = sband,eband
+! !     do column = 1,columns_num(iband,myid)
+! !       do j = jlim(1,vgrid,iband),jlim(2,vgrid,iband)
+! !         u(iband)%f(j,column) = u(iband)%f(j,column)+du(iband)%f(j,column) !For solving for du
+! !       enddo
+! !     enddo
+! !   end do
+
+!   ! do iband = sband,eband
+!   do column = 1,columns_num(myid)
+!     do j = jlim(1,vgrid),jlim(2,vgrid)
+!       u%f(j,column) = du%f(j,column) !For solving for u
+!     enddo
+!   enddo
+!   ! end do
+
+! end subroutine
 
 subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
