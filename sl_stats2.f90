@@ -45,32 +45,10 @@ subroutine sl_stats(u1,u3,myid,status,ierr)
   
   integer :: i,k,kk,j,column,iband
   
-     
-  !real(8) :: bslip_u1_f_bot(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  !real(8) :: bslip_u1_f_top(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  !real(8) :: bslip_u3_f_bot(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  !real(8) :: bslip_u3_f_top(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  
-  !complex(8) :: u1_f   (N(1,bandPL(myid))/2+1,N(2,bandPL(myid)))
-  !complex(8) :: du1dy_f(N(1,bandPL(myid))/2+1,N(2,bandPL(myid)))
-  !complex(8) :: u3_f   (N(1,bandPL(myid))/2+1,N(2,bandPL(myid)))
-  !complex(8) :: du3dy_f(N(1,bandPL(myid))/2+1,N(2,bandPL(myid)))
-  
-  
-  !real(8),pointer :: bslip_u1_f_bot(:,:)
-  !real(8),pointer :: bslip_u1_f_top(:,:)
-  !real(8),pointer :: bslip_u3_f_bot(:,:)
-  !real(8),pointer :: bslip_u3_f_top(:,:)
-  
   complex(8),pointer :: u1_f   (:,:)
   complex(8),pointer :: du1dy_f   (:,:)
   complex(8),pointer :: u3_f   (:,:)
   complex(8),pointer :: du3dy_f   (:,:)
-  
-  !allocate(bslip_u1_f_bot(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  !allocate(bslip_u1_f_top(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  !allocate(bslip_u3_f_bot(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  !allocate(bslip_u3_f_top(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
   
   allocate(u1_f   (N(1,nband)/2+1,N(2,nband)))
   allocate(du1dy_f(N(1,nband)/2+1,N(2,nband)))
@@ -100,15 +78,15 @@ istat_sl=istat_sl+1
   u1_f_PL = 0d0
   u3_f_PL = 0d0
   
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(du1dy_PL,du1dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(du3dy_PL,du3dy_columns,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,status,ierr)
   
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
-  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,nband,status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(1,vgrid),jlim(1,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(u1_f_PL,u1_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,status,ierr)
+  call modes_to_planes_phys_lims_2(u3_f_PL,u3_itp,jlim(2,vgrid),jlim(2,vgrid),vgrid,myid,status,ierr)
   
     
   if(myid==0)then
@@ -179,15 +157,15 @@ subroutine write_sl_stats(myid,status,ierr)
   real(8),pointer :: xreal(:,:)
   real(8),pointer :: xcomp(:,:)
      
-  allocate(xreal(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
-  allocate(xcomp(N(1,bandPL(myid))+2,N(2,bandPL(myid))))
+  allocate(xreal(N(1,nband)+2,N(2,nband)))
+  allocate(xcomp(N(1,nband)+2,N(2,nband)))
  
   if(myid==np-1)then !send
 
-    call MPI_SEND(bslip_u1_M(1,1),(N(1,bandPL(myid))+2)*N(2,bandPL(myid))   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(bslip_du1dy_M(1,1),(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(bslip_u3_M(1,1),(N(1,bandPL(myid))+2)*N(2,bandPL(myid))   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(bslip_du3dy_M(1,1),(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(bslip_u1_M(1,1),(N(1,nband)+2)*N(2,nband)   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(bslip_du1dy_M(1,1),(N(1,nband)+2)*N(2,nband),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(bslip_u3_M(1,1),(N(1,nband)+2)*N(2,nband)   ,MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(bslip_du3dy_M(1,1),(N(1,nband)+2)*N(2,nband),MPI_REAL8   ,0,myid,MPI_COMM_WORLD,ierr)
 
   elseif(myid==0)then !recieve
     fnameimc = trim(dirout)//'sl_stats_'//ext1//'x'//ext2//'x'//ext3//'_'//ext4//'.dat'
@@ -233,11 +211,11 @@ subroutine recvbreal(xread,xlocal,myid,status,ierr)
 
   integer j,iproc,myid
   integer msize
-  real(8) xread(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
-  real(8) xlocal(N(1,bandPL(myid))+2,N(2,bandPL(myid)))
+  real(8) xread(N(1,nband)+2,N(2,nband))
+  real(8) xlocal(N(1,nband)+2,N(2,nband))
 
   
-  call MPI_RECV(xread         ,(N(1,bandPL(myid))+2)*N(2,bandPL(myid)),MPI_REAL8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
+  call MPI_RECV(xread         ,(N(1,nband)+2)*N(2,nband),MPI_REAL8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
   xlocal=xlocal+xread
   write(10) xlocal
 
@@ -256,11 +234,11 @@ subroutine recvbcomp(xread,xlocal,myid,status,ierr)
 
   integer j,iproc,myid
   integer msize
-  complex(8) xread(N(1,bandPL(myid))/2+1,N(2,bandPL(myid))/2)
-  complex(8) xlocal(N(1,bandPL(myid))/2+1,N(2,bandPL(myid))/2)
+  complex(8) xread(N(1,nband)/2+1,N(2,nband)/2)
+  complex(8) xlocal(N(1,nband)/2+1,N(2,nband)/2)
 
 
-  call MPI_RECV(xread,(N(1,bandPL(myid))/2+1)*N(2,bandPL(myid))/2,MPI_COMPLEX8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
+  call MPI_RECV(xread,(N(1,nband)/2+1)*N(2,nband)/2,MPI_COMPLEX8,np-1,np-1,MPI_COMM_WORLD,status,ierr)
   xlocal=xlocal+xread
   write(10) xlocal
 

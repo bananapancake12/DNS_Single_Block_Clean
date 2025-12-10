@@ -12,10 +12,10 @@ Re=       3250.d0 ! Reynolds number, based on bulk velocity and channel half-hei
 ! Box geometry and spacial discretisation ------------------------------------------
 alp   =      1.d0 ! The streamwise periodicity Lx of the box is Lx=2*pi/alp
 bet   =      2.d0 ! The spanwise periodicity Lz of the box is Lz=2*pi/bet
-Ngalx1=        48 ! 384 ! 576 ! 192 ! collocation points in the x direction, 
-Ngalx2=        48 ! bands ignore!
-Ngalz1=        48 ! 360 ! collocation points per unity length in the z direction
-Ngalz2=        48 ! bands ignore!
+Ngalx1=       192 ! 384 ! 576 ! 192 ! collocation points in the x direction, band #1
+Ngalx2=       192 ! 192 ! 192 ! collocation points in the x direction, band #2
+Ngalz1=       192 ! 360 ! collocation points per unity length in the z direction, band #1
+Ngalz2=       192 ! 192 ! collocation points per unity length in the z direction, band #2
 ny    =       153 ! grid points in the y direction, y(0)=-1,y(ny-1)=1
 dyq   =     10.d0 ! dymax/dymin
 pp    =         5 ! y polinomial exponent
@@ -25,7 +25,7 @@ flgin =         1 ! 1 for initial conditions borrowed from another simulation
                   ! 2 for continuing simulation
                   ! 3 parabolic profile
                   ! 4 --
-fnmeb = u1_0032x0032x0153_t00000.dat
+fnmeb = u1_0128x0128x0153_t09455.dat
                   ! initial conditions file path, if flgin=flag_init=1
 dirin  =./input/
 dirout =./output/

@@ -51,8 +51,8 @@ subroutine stats(myid,status,ierr)
    end do
    !!!!!!!!    wx stats:   !!!!!!!!
    do j = limPL_incw(vgrid,1,myid),limPL_incw(vgrid,2,myid)
-      do k = 1,N(2,bandPL(myid))
-         do i = 1,N(1,bandPL(myid))
+      do k = 1,N(2,nband)
+         do i = 1,N(1,nband)
             wxm (j) = wxm (j)+wx(i,k,j)
             wx2m(j) = wx2m(j)+wx(i,k,j)**2
          end do
@@ -83,26 +83,16 @@ subroutine stats(myid,status,ierr)
       end do
    end do
 
-  
-   if (bandPL(myid)==1) then
-      call conddown1(UmC,U2mC,u1PL(1,1,limPL_incw(ugrid,1,myid)),ugrid,myid)
-      call conddown1(VmC,V2mC,u2PL(1,1,limPL_incw(vgrid,1,myid)),vgrid,myid)
-      call conddown1(WmC,W2mC,u3PL(1,1,limPL_incw(ugrid,1,myid)),ugrid,myid)
-      call conddown1(PmC,P2mC,ppPL(1,1,limPL_incw(pgrid,1,myid)),pgrid,myid)
-      call conddown1(wxmC,wx2mC,wx,vgrid,myid)
-      call conddown2(UVmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u2PL_itp(1,1,limPL_incw(ugrid,1,myid)),ugrid,myid)
-      call conddown2(UWmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u3PL    (1,1,limPL_incw(ugrid,1,myid)),ugrid,myid)
-      call conddown2(VWmC,u2PL(1,1,limPL_incw(vgrid,1,myid)),u3PL_itp(1,1,limPL_incw(vgrid,1,myid)),vgrid,myid)
-   else if (bandPL(myid)==nband) then
-      call condup1  (UmC,U2mC,u1PL(1,1,limPL_incw(ugrid,1,myid)),1d0,ugrid,myid)
-      call condup1  (VmC,V2mC,u2PL(1,1,limPL_incw(vgrid,1,myid)),-1d0,vgrid,myid)
-      call condup1  (WmC,W2mC,u3PL(1,1,limPL_incw(ugrid,1,myid)),1d0,ugrid,myid)
-      call condup1  (PmC,P2mC,ppPL(1,1,limPL_incw(pgrid,1,myid)),1d0,pgrid,myid)
-      call condup1  (wxmC,wx2mC,wx,1d0,vgrid,myid)
-      call condup2  (UVmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u2PL_itp(1,1,limPL_incw(ugrid,1,myid)),1d0,-1d0,ugrid,myid)
-      call condup2  (UWmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u3PL    (1,1,limPL_incw(ugrid,1,myid)),1d0,1d0,ugrid,myid)
-      call condup2  (VWmC,u2PL(1,1,limPL_incw(vgrid,1,myid)),u3PL_itp(1,1,limPL_incw(vgrid,1,myid)),-1d0,1d0,vgrid,myid)
-   end if
+
+   call condup1  (UmC,U2mC,u1PL(1,1,limPL_incw(ugrid,1,myid)),1d0,ugrid,myid)
+   call condup1  (VmC,V2mC,u2PL(1,1,limPL_incw(vgrid,1,myid)),-1d0,vgrid,myid)
+   call condup1  (WmC,W2mC,u3PL(1,1,limPL_incw(ugrid,1,myid)),1d0,ugrid,myid)
+   call condup1  (PmC,P2mC,ppPL(1,1,limPL_incw(pgrid,1,myid)),1d0,pgrid,myid)
+   call condup1  (wxmC,wx2mC,wx,1d0,vgrid,myid)
+   call condup2  (UVmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u2PL_itp(1,1,limPL_incw(ugrid,1,myid)),1d0,-1d0,ugrid,myid)
+   call condup2  (UWmC,u1PL(1,1,limPL_incw(ugrid,1,myid)),u3PL    (1,1,limPL_incw(ugrid,1,myid)),1d0,1d0,ugrid,myid)
+   call condup2  (VWmC,u2PL(1,1,limPL_incw(vgrid,1,myid)),u3PL_itp(1,1,limPL_incw(vgrid,1,myid)),-1d0,1d0,vgrid,myid)
+
 
 end subroutine
 
@@ -422,21 +412,20 @@ subroutine write_stats(myid,status,ierr)
    wx2m  = 0d0
    istat = 0
 
-   if (bandPL(myid)==1 .or. bandPL(myid)==nband) then
-      UmC   = 0d0
-      U2mC  = 0d0
-      VmC   = 0d0
-      V2mC  = 0d0
-      WmC   = 0d0
-      W2mC  = 0d0
-      PmC   = 0d0
-      P2mC  = 0d0
-      UVmC  = 0d0
-      UWmC  = 0d0
-      VWmC  = 0d0
-      wxmC  = 0d0
-      wx2mC = 0d0
-   end if
+   UmC   = 0d0
+   U2mC  = 0d0
+   VmC   = 0d0
+   V2mC  = 0d0
+   WmC   = 0d0
+   W2mC  = 0d0
+   PmC   = 0d0
+   P2mC  = 0d0
+   UVmC  = 0d0
+   UWmC  = 0d0
+   VWmC  = 0d0
+   wxmC  = 0d0
+   wx2mC = 0d0
+
 
 end subroutine
 

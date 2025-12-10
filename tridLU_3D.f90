@@ -1,6 +1,45 @@
-!  ! ****** package of utilities for tridiagonal LU factorisation *****
-!  !                                   RGM ETSI Aeronauticos 2008
-!  ! *************************************************************
+! *************************************************************************************************************** !
+!
+! Last modified by LD 08/12/2025
+!   - Set up for SHS
+!   - Tridiag set up for FFT in middle of bands 1 and 3
+!   - Split SolU and SolV as V BC can be solved in Fourier space
+!
+! TODO
+!   - More efficient FFT
+!   - DG needs to contatin option for non-zero v velocity at wall
+!
+! *************************************************************************************************************** !
+!
+! Contains: LUsolU_W    - Called from littleharsh for solveU : calls LU_build and LU_dec
+!                       - Solves the (1-L) matrix for the U and W velocities
+!                       - Decomposed into (1-Lxz)(1-y)
+!                       - Contains FFT to solve wall in physical space and interface in Fourier space
+!           LUsolV    - Called from littleharsh for solveV : calls LU_build and LU_dec
+!                       - Solves the (1-L) matrix for the V velocities
+!                       - Decomposed into (1-Lxz)(1-y)
+!                       - No FFT all Fourier
+!           LUsolP    - Called from littleharsh for solveP : calls LU_buildP and LU_decP
+!                       - Solves the lplacian of the pressure (divergance of the gradient)
+!           LUsol0    - Called in flowrate_corr (part of const. flow rate) : calls LU_build0 and LU_dec0
+!                       - Solves mean mode to calculate pressure gradient for constant mass flow rate
+!           LU_build  - Called from Lusol
+!                       - Builds the (1-L) matrices. Different for u/w and v
+!           LU_buildP - Called from start (with allocation)
+!                       - Builds the DG matrix for the pressure
+!                       - Only called once as no dt dependence
+!           LU_build0 - Called from Lusol0
+!                       - Builds LHS for LUsol0
+!           LU_dec    - Called from LUsol
+!                       - LU Decomposition
+!           LU_decP   - Called from LUsolP
+!                       - LU Decomposition
+!                       - Only called once as no dt dependence
+!           LU_dec0   - Called from LUsol0
+!                       - LU Decomposition
+!
+! *************************************************************************************************************** !
+
 
 
 
@@ -334,11 +373,9 @@
     end do
     
     if(myid==0)then
-        !if(iband==nband)then
         a%f_dg(1,nystart,1) = 0d0
         a%f_dg(2,nystart,1) = 1d0/((yu(1+1)-yu(1)))**2 !C!
         a%f_dg(3,nystart,1) = 0d0
-        !end if
     end if
 
     ! For modified wavenumbers, need BC on last pressure mode (as k2x=k2z=0)

@@ -91,8 +91,6 @@ program littleharsh
 
   include 'mpif.h'                         
   integer status(MPI_STATUS_SIZE),ierr,myid 
-
-  integer iband
   ! type(cfield), allocatable:: u1(:),u2(:),u3(:),p(:),psi(:)
   ! type(cfield), allocatable:: div(:)
   ! type(cfield), allocatable:: Nu1(:),Nu2(:),Nu3(:)
@@ -134,32 +132,6 @@ program littleharsh
 
 itersl=iter0
 nstatsl = nwrite
-  
-  ! Allocate memory for main variables
-  ! allocate( u1 (sband:eband), u2(sband:eband), u3(sband:eband))
-  ! allocate(du1 (sband:eband),du2(sband:eband),du3(sband:eband))
-  ! allocate(Nu1 (sband:eband),Nu2(sband:eband),Nu3(sband:eband))
-  ! allocate( p  (sband:eband))
-  ! allocate( psi(sband:eband))
-  ! allocate( div(sband:eband))
-
-
-
-
-  ! do iband = sband,eband
-  !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-  !   allocate( u2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-  !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-  !   allocate(du2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-  !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
-  !   allocate(Nu2  (iband)%f(jlim(1,vgrid,iband)+1:jlim(2,vgrid,iband)-1,columns_num(iband,myid)))
-  !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
-  !   allocate( p   (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate( psi (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-  !   allocate( div (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-  ! end do
 
   allocate( u1%f ( jlim(1,ugrid)      : jlim(2,ugrid),      columns_num(myid) ) )
   allocate( u2%f ( jlim(1,vgrid)      : jlim(2,vgrid),      columns_num(myid) ) )
@@ -219,8 +191,8 @@ nextqt = floor(t*10d0)/10d0+0.1d0
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
   ! MAIN LOOP 
-  !do while (t<maxt) ! This is the original condition
-  do while (t<maxt .AND. iter <5)
+  do while (t<maxt) ! This is the original condition
+  ! do while (t<maxt .AND. iter <2)
     ! Runge-Kutta substeps
     do kRK = 1,3
       ! Build     linear terms of right-hand-side of Navier-Stokes equation
@@ -239,11 +211,12 @@ nextqt = floor(t*10d0)/10d0+0.1d0
         write(6,*) "Finished Nonlinear =====> Solving"
       end if 
 
-      ! Resolve the matricial system
+      ! Resolve the matricial system (FFT BANDS IMPLEMENTED)
       ! call solveU(u1,du1,1,myid)
       ! call solveV(u2,du2,2,myid)
       ! call solveU(u3,du3,3,myid)
 
+      ! Resolve the matricial system (NO FFT BANDS)
       call solveU_W(u1,du1,u3,du3,a,myid)
       call solveV(u2,du2,a,myid)
 
@@ -284,171 +257,6 @@ nextqt = floor(t*10d0)/10d0+0.1d0
 
 end program
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!! LITTLE HARSH OLD  !!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-! program littleharsh
-
-!   use declaration
-!   implicit none
-
-!   include 'mpif.h'                         
-!   integer status(MPI_STATUS_SIZE),ierr,myid 
-
-!   integer iband
-!   type(cfield), allocatable:: u1(:),u2(:),u3(:),p(:),psi(:)
-!   type(cfield), allocatable:: div(:)
-!   type(cfield), allocatable:: Nu1(:),Nu2(:),Nu3(:)
-!   type(cfield), allocatable:: du1(:),du2(:),du3(:)
-  
-!   real(8):: z,sigmaz
-!   integer column,i,k,j
-
-!   real(8):: flagslstat
-
-!   call MPI_INIT(ierr)
-!   if (ierr.ne.MPI_SUCCESS) pause 'ierr'
-!   call MPI_COMM_SIZE(MPI_COMM_WORLD,np,ierr)      ! np   = Number of processes in the group of comm
-!   call MPI_COMM_RANK(MPI_COMM_WORLD,myid,ierr)    ! myid = rank of the calling process
-
-!   if (myid==0) then
-!     write(*,*) ''
-!     write(*,*) '---------------LITTLE HARSH---------------'
-!     write(*,*) "         'That's a little harsh'          "
-!     write(*,*) '------------------------------------------'
-!     write(*,*) ''
-!   end if
-
-!   ! Initialise
-!   call start(myid,status,ierr)
-
-! itersl=iter0
-! nstatsl = nwrite
-  
-!   ! Allocate memory for main variables
-!   allocate( u1 (sband:eband), u2(sband:eband), u3(sband:eband))
-!   allocate(du1 (sband:eband),du2(sband:eband),du3(sband:eband))
-!   allocate(Nu1 (sband:eband),Nu2(sband:eband),Nu3(sband:eband))
-!   allocate( p  (sband:eband))
-!   allocate( psi(sband:eband))
-!   allocate( div(sband:eband))
-!   ! do iband = sband,eband
-!   !   allocate( u1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-!   !   allocate( u2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate( u3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-!   !   allocate(du1  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-!   !   allocate(du2  (iband)%f(jlim(1,vgrid,iband)  :jlim(2,vgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate(du3  (iband)%f(jlim(1,ugrid)  :jlim(2,ugrid)  ,columns_num(iband,myid)))
-!   !   allocate(Nu1  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
-!   !   allocate(Nu2  (iband)%f(jlim(1,vgrid,iband)+1:jlim(2,vgrid,iband)-1,columns_num(iband,myid)))
-!   !   allocate(Nu3  (iband)%f(jlim(1,ugrid)+1:jlim(2,ugrid)-1,columns_num(iband,myid)))
-!   !   allocate( p   (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate( psi (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-!   !   allocate( div (iband)%f(jlim(1,pgrid,iband)  :jlim(2,pgrid,iband)  ,columns_num(iband,myid)))
-!   ! end do
-
-!   do iband = sband, eband
-
-!     allocate( u1 (iband)%f( jlim(1,ugrid)  : jlim(2,ugrid),  columns_num(myid) ) )
-!     allocate( u2 (iband)%f( jlim(1,vgrid)  : jlim(2,vgrid),  columns_num(myid) ) )
-!     allocate( u3 (iband)%f( jlim(1,ugrid)  : jlim(2,ugrid),  columns_num(myid) ) )
-
-!     allocate(du1 (iband)%f( jlim(1,ugrid)  : jlim(2,ugrid),  columns_num(myid) ) )
-!     allocate(du2 (iband)%f( jlim(1,vgrid)  : jlim(2,vgrid),  columns_num(myid) ) )
-!     allocate(du3 (iband)%f( jlim(1,ugrid)  : jlim(2,ugrid),  columns_num(myid) ) )
-
-!     allocate(Nu1 (iband)%f( jlim(1,ugrid)+1 : jlim(2,ugrid)-1, columns_num(myid) ) )
-!     allocate(Nu2 (iband)%f( jlim(1,vgrid)+1 : jlim(2,vgrid)-1, columns_num(myid) ) )
-!     allocate(Nu3 (iband)%f( jlim(1,ugrid)+1 : jlim(2,ugrid)-1, columns_num(myid) ) )
-
-!     allocate( p   (iband)%f( jlim(1,pgrid) : jlim(2,pgrid), columns_num(myid) ) )
-!     allocate( psi (iband)%f( jlim(1,pgrid) : jlim(2,pgrid), columns_num(myid) ) )
-!     allocate( div (iband)%f( jlim(1,pgrid) : jlim(2,pgrid), columns_num(myid) ) )
-
-!   end do
-
-
-
-
-!   do iband = sband,eband
-!      u1  (iband)%f = 0d0
-!      u2  (iband)%f = 0d0
-!      u3  (iband)%f = 0d0
-!     du1  (iband)%f = 0d0
-!     du2  (iband)%f = 0d0
-!     du3  (iband)%f = 0d0
-!     Nu1  (iband)%f = 0d0
-!     Nu2  (iband)%f = 0d0
-!     Nu3  (iband)%f = 0d0
-!      p   (iband)%f = 0d0
-!      psi (iband)%f = 0d0
-!      div (iband)%f = 0d0
-!   end do
-
-!   ! Get the initial conditions
-!   call getini(u1,u2,u3,p,div,myid,status,ierr)
-
-! nextqt = floor(t*10d0)/10d0+0.1d0
-  
-!   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-!   if (myid==0) then
-!     write(*,*) ''
-!     write(*,*) 'Initialised'
-!   end if
-!   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-!   ! MAIN LOOP 
-!   !do while (t<maxt) ! This is the original condition
-!   do while (t<maxt .AND. iter < 5)
-!     ! Runge-Kutta substeps
-!     do kRK = 1,3
-!       ! Build     linear terms of right-hand-side of Navier-Stokes equation
-!       call RHS0_u1(du1,u1,Nu1,p,myid)
-!       call RHS0_u2(du2,u2,Nu2,p,myid)
-!       call RHS0_u3(du3,u3,Nu3,p,myid)
-      
-!       ! Build non-linear terms of right-hand-side of Navier-Stokes equation
-!       call nonlinear(Nu1,Nu2,Nu3,u1,u2,u3,du1,du2,du3,p,div,myid,status,ierr)
-!       ! Resolve the matricial system
-!       call solveU(u1,du1,1,myid)
-!       call solveV(u2,du2,2,myid)
-!       call solveU(u3,du3,3,myid)
-      
-!      ! Compute the pressure gradient if constant mass flow condition is set
-!      if (flag_ctpress==0) then
-!        if (myid == 0) then
-!          call meanflow_ctU(u1,myid) ! Computes the convenient mpgx
-!        endif
-!      end if
-      
-!       ! Solves pressure matrix
-!       call solveP(p,psi,u1,u2,u3,div,myid)
-
-!       ! Correct velocity for incompressibility
-!       call v_corr(u1,u2,u3,psi,div,myid,status,ierr)
-    
-!     end do
-    
-!     ! Evaluate mass flow if constant pressure gradient is set
-!     if (flag_ctpress==1) then
-!       if (myid == 0) then
-!         call meanflow_ctP(u1,myid)
-!       end if
-!     end if
-
-!     iter = iter+1
-
-!   end do 
-
-!   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-
-!   ! Deallocate memory and shut communications
-!   call finalize(u1,u2,u3,p,div,myid,status,ierr)
-
-! end program
-
 subroutine divergence(div,u1,u2,u3,myid)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!   DIVERGENCE   !!!!!!!!!!!!!!!!!!!!!!!
@@ -464,11 +272,6 @@ subroutine divergence(div,u1,u2,u3,myid)
   implicit none
 
   integer i,k,j,myid,column
-  ! complex(8) div(jlim(1,pgrid,iband):jlim(2,pgrid,iband),columns_num(iband,myid))
-  ! complex(8)  u1(jlim(1,ugrid):jlim(2,ugrid),columns_num(iband,myid))
-  ! complex(8)  u2(jlim(1,vgrid,iband):jlim(2,vgrid,iband),columns_num(iband,myid))
-  ! complex(8)  u3(jlim(1,ugrid):jlim(2,ugrid),columns_num(iband,myid))
-
   complex(8)  div( jlim(1,pgrid) : jlim(2,pgrid), columns_num(myid) )
   complex(8)   u1( jlim(1,ugrid) : jlim(2,ugrid), columns_num(myid) )
   complex(8)   u2( jlim(1,vgrid) : jlim(2,vgrid), columns_num(myid) )
@@ -593,12 +396,11 @@ subroutine error(A,myid,ierr)
   include 'mpif.h'             ! MPI variables
   integer ierr
 
-  integer j,iband,column,myid
+  integer j,column,myid
   type(cfield) A
   real(8) erri,errband
 
   erri = 0d0
-  ! do iband = sband,eband
   errband = 0d0
   do column = 1,columns_num(myid)
     do j = jlim(1,pgrid),jlim(2,pgrid)
@@ -609,7 +411,7 @@ subroutine error(A,myid,ierr)
     end do
   end do
   erri = max(erri,errband)
-  ! end do
+
 
   !if (myid == 0) then
   ! write(6,*) 'error(): size(A%f,1:2)=', size(A%f,1), size(A%f,2)
@@ -635,7 +437,7 @@ subroutine finalize(u1,u2,u3,p,div,myid,status,ierr)
   include 'mpif.h'             ! MPI variables
   integer status(MPI_STATUS_SIZE),ierr,myid
 
-  integer iproc,iband,j
+  integer iproc,j
   real(8) val
   type(cfield)  u1, u2, u3
   type(cfield)   p, div
@@ -651,8 +453,6 @@ subroutine finalize(u1,u2,u3,p,div,myid,status,ierr)
   call modes_to_planes_UVP(u2PL,u2,1,myid,status,ierr)
   call modes_to_planes_UVP(u3PL,u3,2,myid,status,ierr)
   call modes_to_planes_UVP(ppPL, p,3,myid,status,ierr)
- 
-  ! iband = bandPL(myid)
 
   call record_out(u1,myid)
 
@@ -773,6 +573,10 @@ subroutine maxvel(u)
     Umax = max(Umax,dreal(u(j)))
   end do
 
+  ! do j= 1, 152
+  !   write(6,*) " Umax", Umax, dreal(u(j)), "j", j
+  ! end do 
+
 end subroutine
 
 subroutine meanflow_ctP(u1,myid)
@@ -834,18 +638,13 @@ subroutine solveP(p,psi,u1,u2,u3,div,myid)
 
   use declaration
   implicit none
-  integer :: i,k,j,iband,column,myid
-  ! type(cfield) ::  u1(sband:eband),u2  (sband:eband),u3 (sband:eband)
-  ! type(cfield) ::  p (sband:eband),psi (sband:eband)
-  ! type(cfield) :: div(sband:eband)
+  integer :: i,k,j,column,myid
 
   type(cfield) :: u1, u2, u3, p, psi, div
 
   real(8) :: dtirk
  
   dtirk = dti/(aRK(kRK)+bRK(kRK))
-
-  ! do iband = sband,eband
 
   call divergence(div%f,u1%f,u2%f,u3%f,myid)
       
@@ -857,9 +656,7 @@ subroutine solveP(p,psi,u1,u2,u3,div,myid)
   
   !Boundary condition for pressure
   if (myid==0) then
-    !if (iband==midband) then
     psi%f(jlim(1,pgrid),1) = 0d0 !C! Psi (mean) at bottom of channel = 0
-    ! end if
   end if
 
 ! For modified wavenumbers, need BC on last pressure mode (as k2x=k2z=0)
@@ -947,7 +744,7 @@ subroutine RHS0_u2(du2,u2,Nu2,p,myid)
 
   use declaration
   implicit none
-  integer i,k,j,iband,column,myid
+  integer i,k,j,column,myid
   type(cfield)  u2
   type(cfield) du2
   type(cfield) Nu2
@@ -960,7 +757,7 @@ subroutine RHS0_u2(du2,u2,Nu2,p,myid)
 
   ! write(6,*) "C1", C1, "C2", C2, myid
 
-  ! do iband = sband,eband
+ 
   call laplacian_V(du2%f,u2%f,myid)
   do column = 1,columns_num(myid)
     do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
@@ -1001,7 +798,7 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
 
   use declaration
   implicit none
-  integer i,k,j,iband,column,myid
+  integer i,k,j,column,myid
   type(cfield)  u3
   type(cfield) du3
   type(cfield) Nu3
@@ -1013,7 +810,6 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
   C1 = aRK(kRK)/Re !For solving for u
   C2 = -cRK(kRK)
 
-  ! do iband = sband,eband
   call laplacian_U(du3%f,u3%f,myid)
   do column = 1,columns_num(myid)
     k = columns_k(column,myid)
@@ -1043,9 +839,13 @@ subroutine RHS0_u3(du3,u3,Nu3,p,myid)
     ! end if
     
   end do
-  ! end do
 
 end subroutine
+
+
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!  NO FFT BANDS  !!!!!!!!!!!!!!!!!!!!!!!
+   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
 subroutine solveU_W(u,du,w,dw,a,myid) !pass (u,du,w,dw)
@@ -1063,7 +863,6 @@ subroutine solveU_W(u,du,w,dw,a,myid) !pass (u,du,w,dw)
    type(cfield) dw
    type(rfield) a(2)
 
-   ! do iband = sband,eband
     do column = 1,columns_num(myid)
         i = columns_i(column,myid)
         k = columns_k(column,myid)
@@ -1078,62 +877,10 @@ subroutine solveU_W(u,du,w,dw,a,myid) !pass (u,du,w,dw)
         du%f(jlim(2,ugrid),column) = 0d0
         dw%f(jlim(2,ugrid),column) = 0d0
     end do
-   ! end do
 
-   ! call immersed_boundaries_U_W(u,du,w,dw,ugrid,myid)
-
-   ! do iband = sband,eband
     call LUsolU_W(u,du,w,dw,a(ugrid)%fr(1:3,jlim(1,ugrid):jlim(2,ugrid)),ugrid,myid)
-   ! end do
-end subroutine
-
-subroutine solveU(u,du,ufield,myid)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  use declaration
-  implicit none
-
-  integer i,k,j,iband,column,myid,ufield
-  type(cfield)  u
-  type(cfield) du
-
-  !do iband = sband,eband
-  do column = 1,columns_num(myid)
-    i = columns_i(column,myid)
-    k = columns_k(column,myid)
-    du%f(jlim(1,ugrid),column) = 0d0
-    do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
-!         du%f(j,column) = dt*(du%f(j,column)) !For solving for du
-      du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
-    end do
-    du%f(jlim(2,ugrid),column) = 0d0
-  end do
-  ! end do
-
-  call LUsolV(du,ugrid,ufield,myid)
-!call LUsolV(du,ugrid,myid) !Can use for smooth channel
-
-!   do iband = sband,eband
-!     do column = 1,columns_num(myid)
-!       do j = jlim(1,ugrid),jlim(2,ugrid)
-!         u%f(j,column) = u%f(j,column)+du%f(j,column) !For solving for du
-!       enddo
-!     enddo
-!   end do
-
-  ! do iband = sband,eband
-  do column = 1,columns_num(myid)
-    do j = jlim(1,ugrid),jlim(2,ugrid)
-      u%f(j,column) = du%f(j,column) !For solving for u
-    enddo
-  enddo
-  ! end do
 
 end subroutine
-
-
 
 subroutine solveV(u,du,a,myid)
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1147,7 +894,6 @@ subroutine solveV(u,du,a,myid)
    type(cfield) du
    type(rfield) a(2)
 
-   ! do iband = sband,eband
     do column = 1,columns_num(myid)
         i = columns_i(column,myid)
         k = columns_k(column,myid)
@@ -1158,14 +904,63 @@ subroutine solveV(u,du,a,myid)
         end do
         du%f(jlim(2,vgrid),column) = 0d0
     end do
-   ! end do
 
-   ! call immersed_boundaries_V(u,du,vgrid,myid)
-   
-   ! do iband = sband,eband
     call LUsolV(u,du,a(vgrid)%fr(1:3,jlim(1,vgrid):jlim(2,vgrid)),vgrid,myid)
-   !end do
+
 end subroutine
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!   FFT BANDS  (SOLVE AND SOLVEV)  !!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+! subroutine solveU(u,du,ufield,myid)
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!    SOLVE U1    !!!!!!!!!!!!!!!!!!!!!!!
+! !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+!   use declaration
+!   implicit none
+
+!   integer i,k,j,iband,column,myid,ufield
+!   type(cfield)  u
+!   type(cfield) du
+
+!   !do iband = sband,eband
+!   do column = 1,columns_num(myid)
+!     i = columns_i(column,myid)
+!     k = columns_k(column,myid)
+!     du%f(jlim(1,ugrid),column) = 0d0
+!     do j = jlim(1,ugrid)+1,jlim(2,ugrid)-1
+! !         du%f(j,column) = dt*(du%f(j,column)) !For solving for du
+!       du%f(j,column) = u%f(j,column)+dt*(du%f(j,column)) !For solving for u
+!     end do
+!     du%f(jlim(2,ugrid),column) = 0d0
+!   end do
+!   ! end do
+
+!   call LUsolV(du,ugrid,ufield,myid)
+! !call LUsolV(du,ugrid,myid) !Can use for smooth channel
+
+! !   do iband = sband,eband
+! !     do column = 1,columns_num(myid)
+! !       do j = jlim(1,ugrid),jlim(2,ugrid)
+! !         u%f(j,column) = u%f(j,column)+du%f(j,column) !For solving for du
+! !       enddo
+! !     enddo
+! !   end do
+
+!   ! do iband = sband,eband
+!   do column = 1,columns_num(myid)
+!     do j = jlim(1,ugrid),jlim(2,ugrid)
+!       u%f(j,column) = du%f(j,column) !For solving for u
+!     enddo
+!   enddo
+!   ! end do
+
+! end subroutine
 
 
 ! subroutine solveV(u,du,ufield,myid)
@@ -1213,6 +1008,9 @@ end subroutine
 
 ! end subroutine
 
+
+
+
 subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!     V_CORR     !!!!!!!!!!!!!!!!!!!!!!!
@@ -1237,7 +1035,7 @@ subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
   !!!!!!!!!      u1:      !!!!!!!!!
   dtrk = dt*(aRK(kRK)+bRK(kRK))
  
-  !do iband = sband,eband
+
   do column = 1,columns_num(myid)
     i  = columns_i(column,myid)
     kx = dtrk*k1F_x(i)
@@ -1247,13 +1045,12 @@ subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
     end do
 
   end do
-  !end do
 
-  ! do iband = 1,2
+
   do column = 1,columns_num(myid)
     u1%f(jlim(1,ugrid),column) = gridweighting_bc_u1*u1%f(jlim(1,ugrid)+1,column)
   enddo
-  ! enddo
+
   
   ! do iband = 2,3
   do column = 1,columns_num(myid)
@@ -1263,7 +1060,7 @@ subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
   
 !!!!!!!!!      u2:      !!!!!!!!!
   dtrk_u2 = dtrk*ddthetavi
-  ! do iband = sband,eband
+
   do column = 1,columns_num(myid)
     
     do j = jlim(1,vgrid)+1,jlim(2,vgrid)-1
@@ -1272,14 +1069,13 @@ subroutine v_corr(u1,u2,u3,psi,div,myid,status,ierr)
 !       u2(iband)%f(jlim(1,vgrid),column) = 0d0
 !       u2(iband)%f(jlim(2,vgrid),column) = 0d0
 
-u2%f(jlim(1,vgrid),column) = 0d0
-u2%f(jlim(2,vgrid),column) = 0d0
+    u2%f(jlim(1,vgrid),column) = 0d0
+    u2%f(jlim(2,vgrid),column) = 0d0
 
   end do
-  ! end do
 
   !!!!!!!!!      u3:      !!!!!!!!!
-  !do iband = sband,eband
+
   do column = 1,columns_num(myid)
     k  = columns_k(column,myid)
     kz = dtrk*k1F_z(k)
@@ -1289,7 +1085,7 @@ u2%f(jlim(2,vgrid),column) = 0d0
     end do
 
   end do
-  !end do
+
 
   ! do iband = 1,2
   do column = 1,columns_num(myid)
@@ -1301,12 +1097,12 @@ u2%f(jlim(2,vgrid),column) = 0d0
   do column = 1,columns_num(myid)
     u3%f(jlim(2,ugrid),column) = gridweighting_bc_u3*u3%f(jlim(2,ugrid)-1,column)
   enddo
-  ! enddo
+
   
   
   !!!!!!!!!  divergence:  !!!!!!!!!
-  ! do iband = sband,eband
+
   call divergence(div%f,u1%f,u2%f,u3%f,myid)
-  ! end do
+
 deallocate(vcorrPL)
 end subroutine
