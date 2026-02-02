@@ -114,6 +114,10 @@ subroutine start(myid,status,ierr)
     read(40,20) Ngal(2,nband)
     read(40,20)
 
+    ! fill cols 1:4 with vals 
+    Ngal(1,1:nband)= Ngal(1,nband)
+    Ngal(2,1:nband)= Ngal(2,nband)
+
     ! grid points in the 'y' direction from 'y=-1' to 'y=1'
     read(40,20) Ngal(3,nband)
     Ngal(3,nband) = Ngal(3,nband)-2
@@ -123,8 +127,8 @@ subroutine start(myid,status,ierr)
     allocate(Ny(3,0:nband+1))
     N = Ngal
    
-    N(1,nband) = 2*(Ngal(1,nband)/3)
-    N(2,nband) = 2*(Ngal(2,nband)/3)
+    N(1,1:nband) = 2*(Ngal(1,nband)/3)
+    N(2,1:nband) = 2*(Ngal(2,nband)/3)
     
     read(40,10) dyq              ! dymax/dymin
     read(40,20) ppp              ! y polinomial exponent
@@ -808,6 +812,16 @@ subroutine ygrid
   ! do i = 1,4
   !   write(6,*) N(i,0:4)
   ! end do
+
+  write(6,*) "N:"
+  do i = 1,4
+    write(6,*) N(i,0:4)
+  end do
+
+  write(6,*) "Ngal:"
+  do i = 1,4
+    write(6,*) Ngal(i,0:4)
+  end do
   
   Ny = 0
 

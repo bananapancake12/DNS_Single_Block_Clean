@@ -1,0 +1,9 @@
+filelist =unify_stats_list.input
+firstgood=         0 ! first file to accumulate conditional statistics
+fildir   =../output/ !no_space_after_equal_sign
+nx       =       128 !
+nz       =       128 !
+ny       =       153 !
+ptstilex =       128 ! points per tile in x
+ptstilez =       128 ! points per tile in z
+       10|      I10|                                              A60|

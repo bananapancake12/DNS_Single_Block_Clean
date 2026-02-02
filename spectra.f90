@@ -180,4 +180,15 @@ subroutine recvwrspec(spX,buffSP,grid,myid,status,ierr)
   write(10) buffSP
   close(10)
 
+
+  ! ===== PRINT WHAT WAS WRITTEN (real values) =====
+
+  ! write(6,*) "dummint = ", 0
+  ! write(6,*) "t,Re,alp,bet,mpgx,nband,iter = ", t, Re, alp, bet, mpgx, nband, iter
+  ! write(6,*) "N = ", N
+  ! write(6,*) "yu,dthetai,dthdyu = ", yu, dthetai, dthdyu
+  ! write(6,*) "yv,dthetai,dthdyv = ", yv, dthetai, dthdyv
+  ! write(6,*) "istat = ", istat
+  ! write(6,*) "buffSP written, size = ", size(buffSP)
+
 end subroutine

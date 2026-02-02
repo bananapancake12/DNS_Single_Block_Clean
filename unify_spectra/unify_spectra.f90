@@ -80,6 +80,7 @@ subroutine readspXu
   integer i,k,j
 
   fnameima = filout(1:index(filout,' ')-1)//extL(isamp)//'.dat'
+  ! write(6,*) "fnameima", fnameima
 
   open(20,file=fnameima,form='unformatted')
   read(20) 
@@ -218,12 +219,17 @@ subroutine start
   allocate(N(4,0:nband+1))
   read(20) N
   write(*,*) 'N'
-  do dnz=1,nband
-    write(*,*) N(:,dnz)
-  end do
+  ! do dnz=1,nband
+  !   write(*,*) N(:,dnz)
+  ! end do
+  do dnz = 1, 4
+    write(6,*) N(dnz, :)
+  end do 
   write(*,*) ''
-  nx  = N(1,(nband+1)/2)/2
-  nz  = N(2,(nband+1)/2)/2+1 !The plus 1 is due to a rouge +1 in spectra.f90...
+  nx  = N(1,(nband))/2
+  write (6,*) "nx", nx 
+  nz  = N(2,(nband))/2+1 !The plus 1 is due to a rouge +1 in spectra.f90...
+  write (6,*) "nz", nz
   nyu0 = N(4,0)
   nyuF = N(4,nband)+1
   nyv0 = N(3,0)
@@ -234,8 +240,8 @@ subroutine start
   read(20) yv,dthetai,dthdyv
   close(20)
 
-  ntilex = N(1,1)/ptstilex  ! Ngal(1,1)/(points per tile in x)
-  ntilez = N(2,1)/ptstilez  ! Ngal(2,1)/(points per tile in z)
+  ntilex = N(1,nband)/ptstilex  ! Ngal(1,1)/(points per tile in x)
+  ntilez = N(2,nband)/ptstilez  ! Ngal(2,1)/(points per tile in z)
 
   write(*,*) 'ntilez',ntilez
   write(*,*) 'nsamp',nsamp
@@ -247,8 +253,8 @@ subroutine start
   Lz = 2d0*pi/bet
   Ly = 2d0
   
-  dnyu = N(4,1)-N(4,0)+1
-  dnyv = N(3,1)-N(3,0)+1
+  dnyu = N(4,nband)-N(4,0)+1
+  dnyv = N(3,nband)-N(3,0)+1
   
   allocate(spU(0:nx,1:nz,nyu0:nyuF),spXu(0:nx,1:nz,nyu0:nyuF))
   allocate(spV(0:nx,1:nz,nyv0:nyvF),spXv(0:nx,1:nz,nyv0:nyvF))

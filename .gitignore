@@ -1,1 +1,3 @@
+output_messy/
 output/
+slurm-*.out

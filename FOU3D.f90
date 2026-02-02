@@ -1988,7 +1988,7 @@ subroutine record_out(u1,myid)
 
     deallocate(buffSR)
   else
-    write(ext4,'(i5.5)') int(10000d0*(t))!int(t)!
+    write(ext4,'(i5.5)') int(10d0*(t))!int(t)!
     allocate(dummint(88))
     dummint = 0
     !!!!!!!!!!!!!    u1    !!!!!!!!!!!!!
